@@ -51,7 +51,9 @@ export const approveVoter = async (voterId, expirationDate) => {
     });
 
     // Send verification email
-    const verificationLink = `${window.location.origin}/verify-email?token=${token}`;
+    // Use production URL from env, fallback to current origin for local testing
+    const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    const verificationLink = `${baseUrl}/verify-email?token=${token}`;
     const formattedDate = new Date(expirationDate).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
