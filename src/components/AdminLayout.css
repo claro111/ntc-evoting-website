@@ -1,0 +1,114 @@
+.admin-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.admin-sidebar {
+  width: 200px;
+  background: #003366;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* Logo Section */
+.admin-sidebar-logo {
+  padding: 24px 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-logo-image {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 12px;
+}
+
+.admin-logo-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+}
+
+/* Navigation */
+.admin-nav {
+  flex: 1;
+  padding: 20px 0;
+}
+
+.admin-nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.admin-nav-item {
+  margin-bottom: 4px;
+}
+
+.admin-nav-button {
+  width: 100%;
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  color: white;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.admin-nav-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.admin-nav-button.active {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  border-left: 4px solid #fbbf24;
+  padding-left: 16px;
+}
+
+/* Logout Section */
+.admin-sidebar-footer {
+  padding: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-logout-button {
+  width: 100%;
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  color: white;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.admin-logout-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Main Content */
+.admin-main-content {
+  flex: 1;
+  overflow-y: auto;
+  height: 100%;
+  width: 100%;
+}

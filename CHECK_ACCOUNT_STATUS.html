@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Account Status</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #003366;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #003366;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #002244;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+        .result.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            display: block;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Check Account Status</h1>
+        <p>Enter an email to check if it exists in Firebase Auth and Firestore.</p>
+        
+        <input type="email" id="emailInput" placeholder="Enter email (e.g., user@ntc.edu.ph)">
+        <button onclick="checkAccount()">Check Account</button>
+        
+        <div id="result" class="result"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        // TODO: Replace with your Firebase config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        window.checkAccount = async function() {
+            const email = document.getElementById('emailInput').value.trim();
+            const resultDiv = document.getElementById('result');
+            
+            if (!email) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = '❌ Please enter an email address';
+                return;
+            }
+
+            resultDiv.className = 'result info';
+            resultDiv.innerHTML = '🔄 Checking...';
+
+            try {
+                // Check Firestore
+                const votersRef = collection(db, 'voters');
+                const q = query(votersRef, where('email', '==', email));
+                const querySnapshot = await getDocs(q);
+
+                let firestoreData = null;
+                if (!querySnapshot.empty) {
+                    const doc = querySnapshot.docs[0];
+                    firestoreData = {
+                        id: doc.id,
+                        ...doc.data()
+                    };
+                }
+
+                // Display results
+                let html = '<h3>Results:</h3>';
+                
+                if (firestoreData) {
+                    html += '<div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0;">';
+                    html += '<strong>✅ Found in Firestore</strong><br>';
+                    html += `<strong>Status:</strong> ${firestoreData.status}<br>`;
+                    html += `<strong>Email Verified:</strong> ${firestoreData.emailVerified ? 'Yes' : 'No'}<br>`;
+                    html += `<strong>Full Name:</strong> ${firestoreData.fullName}<br>`;
+                    html += `<strong>Student ID:</strong> ${firestoreData.studentId}<br>`;
+                    html += `<strong>Document ID:</strong> ${firestoreData.id}<br>`;
+                    html += '</div>';
+                    
+                    html += '<h4>Full Data:</h4>';
+                    html += '<pre>' + JSON.stringify(firestoreData, null, 2) + '</pre>';
+                    
+                    html += '<h4>What to do:</h4>';
+                    html += '<ol>';
+                    html += '<li>Go to Firebase Console → Firestore Database</li>';
+                    html += '<li>Open the "voters" collection</li>';
+                    html += `<li>Find document with ID: <code>${firestoreData.id}</code></li>`;
+                    html += '<li>Delete the document</li>';
+                    html += '<li>Also delete from Firebase Auth if it exists</li>';
+                    html += '</ol>';
+                } else {
+                    html += '<div style="background: #d4edda; padding: 10px; border-radius: 5px; margin: 10px 0;">';
+                    html += '<strong>❌ Not found in Firestore</strong><br>';
+                    html += 'The email does not exist in the voters collection.';
+                    html += '</div>';
+                    
+                    html += '<h4>What to do:</h4>';
+                    html += '<ol>';
+                    html += '<li>Check Firebase Console → Authentication → Users</li>';
+                    html += '<li>If the email exists there, delete it</li>';
+                    html += '<li>Then try registering again</li>';
+                    html += '</ol>';
+                }
+
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = html;
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h3>❌ Error</h3>
+                    <p>${error.message}</p>
+                    <h4>Common Issues:</h4>
+                    <ul>
+                        <li>Make sure you've replaced the Firebase config in this file</li>
+                        <li>Make sure you're logged in as admin</li>
+                        <li>Check your Firestore security rules</li>
+                    </ul>
+                `;
+            }
+        };
+    </script>
+</body>
+</html>

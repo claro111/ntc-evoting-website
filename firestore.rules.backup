@@ -1,0 +1,109 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Helper function to check if user is registered voter
+    function isRegisteredVoter() {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/voters/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/voters/$(request.auth.uid)).data.status == 'registered';
+    }
+    
+    // Admins collection - only admins can read/write
+    match /admins/{adminId} {
+      allow read: if request.auth != null && request.auth.uid == adminId;
+      allow write: if isAdmin();
+    }
+    
+    // Voters collection
+    match /voters/{voterId} {
+      // Voters can read their own data
+      allow read: if request.auth != null && request.auth.uid == voterId;
+      // Admins can read all voters
+      allow read: if isAdmin();
+      // Anyone can create (for registration)
+      allow create: if request.auth != null;
+      // Only admins can update/delete
+      allow update, delete: if isAdmin();
+    }
+    
+    // Elections collection
+    match /elections/{electionId} {
+      // Anyone authenticated can read elections
+      allow read: if request.auth != null;
+      // Only admins can write
+      allow write: if isAdmin();
+    }
+    
+    // Positions collection
+    match /positions/{positionId} {
+      // Anyone authenticated can read positions
+      allow read: if request.auth != null;
+      // Only admins can write
+      allow write: if isAdmin();
+    }
+    
+    // Candidates collection
+    match /candidates/{candidateId} {
+      // Anyone authenticated can read candidates
+      allow read: if request.auth != null;
+      // Only admins can write
+      allow write: if isAdmin();
+    }
+    
+    // Votes collection - anonymized, no voterId stored
+    match /votes/{voteId} {
+      // Only admins can read votes (for counting)
+      allow read: if isAdmin();
+      // Registered voters can create votes
+      allow create: if isRegisteredVoter();
+      // No updates or deletes allowed
+      allow update, delete: if false;
+    }
+    
+    // Vote receipts - separate from votes for privacy
+    match /vote_receipts/{receiptId} {
+      // Voters can only read their own receipts
+      allow read: if request.auth != null && request.auth.uid == resource.data.voterId;
+      // System creates receipts (same permission as votes)
+      allow create: if isRegisteredVoter();
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+    
+    // Announcements collection
+    match /announcements/{announcementId} {
+      // Anyone authenticated can read announcements
+      allow read: if request.auth != null;
+      // Only admins can write
+      allow write: if isAdmin();
+    }
+    
+    // Email verifications collection - for email verification tokens
+    match /email_verifications/{verificationId} {
+      // Anyone can read to verify tokens (needed for email verification)
+      allow read: if true;
+      // Admins can create verification tokens
+      allow create: if isAdmin();
+      // System can update when token is used
+      allow update: if true;
+      // No deletes
+      allow delete: if false;
+    }
+    
+    // Audit logs - admin only
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+  }
+}

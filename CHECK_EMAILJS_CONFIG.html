@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check EmailJS Configuration</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #003366;
+      margin-bottom: 20px;
+    }
+    .status {
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .warning {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    button {
+      background: #003366;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #004080;
+    }
+    pre {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      border: 1px solid #dee2e6;
+    }
+    .config-item {
+      margin: 10px 0;
+      padding: 10px;
+      background: #f8f9fa;
+      border-left: 4px solid #003366;
+    }
+    .config-label {
+      font-weight: bold;
+      color: #003366;
+    }
+    .config-value {
+      font-family: monospace;
+      color: #495057;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 EmailJS Configuration Checker</h1>
+    
+    <div id="results"></div>
+    
+    <button onclick="checkConfig()">Check Configuration</button>
+    <button onclick="testEmail()">Test Email Send</button>
+  </div>
+
+  <script type="module">
+    // Import environment variables
+    const config = {
+      serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
+      templateApproval: import.meta.env.VITE_EMAILJS_TEMPLATE_APPROVAL,
+      templateRejection: import.meta.env.VITE_EMAILJS_TEMPLATE_REJECTION,
+      publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
+    };
+
+    window.emailConfig = config;
+
+    function displayResults(html) {
+      document.getElementById('results').innerHTML = html;
+    }
+
+    window.checkConfig = function() {
+      let html = '<h2>Configuration Status</h2>';
+      let allGood = true;
+
+      // Check Service ID
+      if (!config.serviceId || config.serviceId.includes('your_') || config.serviceId === 'your_service_id') {
+        html += '<div class="status error">❌ Service ID: Missing or placeholder</div>';
+        html += '<div class="config-item"><span class="config-label">Current value:</span> <span class="config-value">' + (config.serviceId || 'undefined') + '</span></div>';
+        html += '<p>👉 Should start with "service_" (e.g., service_abc123xyz)</p>';
+        allGood = false;
+      } else {
+        html += '<div class="status success">✅ Service ID: Configured</div>';
+        html += '<div class="config-item"><span class="config-value">' + config.serviceId + '</span></div>';
+      }
+
+      // Check Approval Template
+      if (!config.templateApproval || config.templateApproval.includes('your_') || config.templateApproval === 'your_approval_template_id_here') {
+        html += '<div class="status error">❌ Approval Template ID: Missing or placeholder</div>';
+        html += '<div class="config-item"><span class="config-label">Current value:</span> <span class="config-value">' + (config.templateApproval || 'undefined') + '</span></div>';
+        html += '<p>👉 Should start with "template_" (e.g., template_abc123xyz)</p>';
+        allGood = false;
+      } else {
+        html += '<div class="status success">✅ Approval Template ID: Configured</div>';
+        html += '<div class="config-item"><span class="config-value">' + config.templateApproval + '</span></div>';
+      }
+
+      // Check Rejection Template
+      if (!config.templateRejection || config.templateRejection.includes('your_') || config.templateRejection === 'your_rejection_template_id_here') {
+        html += '<div class="status error">❌ Rejection Template ID: Missing or placeholder</div>';
+        html += '<div class="config-item"><span class="config-label">Current value:</span> <span class="config-value">' + (config.templateRejection || 'undefined') + '</span></div>';
+        html += '<p>👉 Should start with "template_" (e.g., template_def456uvw)</p>';
+        allGood = false;
+      } else {
+        html += '<div class="status success">✅ Rejection Template ID: Configured</div>';
+        html += '<div class="config-item"><span class="config-value">' + config.templateRejection + '</span></div>';
+      }
+
+      // Check Public Key
+      if (!config.publicKey || config.publicKey.includes('your_') || config.publicKey === 'your_public_key_here') {
+        html += '<div class="status error">❌ Public Key: Missing or placeholder</div>';
+        html += '<div class="config-item"><span class="config-label">Current value:</span> <span class="config-value">' + (config.publicKey || 'undefined') + '</span></div>';
+        html += '<p>👉 Should be a long alphanumeric string (e.g., AbCdEfGhIjKlMnOpQr)</p>';
+        allGood = false;
+      } else {
+        html += '<div class="status success">✅ Public Key: Configured</div>';
+        html += '<div class="config-item"><span class="config-value">' + config.publicKey.substring(0, 10) + '...</span></div>';
+      }
+
+      if (allGood) {
+        html += '<div class="status success">🎉 All configuration values are set!</div>';
+        html += '<p>Now click "Test Email Send" to verify EmailJS is working.</p>';
+      } else {
+        html += '<div class="status warning">⚠️ Configuration incomplete</div>';
+        html += '<h3>How to fix:</h3>';
+        html += '<ol>';
+        html += '<li>Go to <a href="https://dashboard.emailjs.com/" target="_blank">EmailJS Dashboard</a></li>';
+        html += '<li>Get your Service ID from "Email Services"</li>';
+        html += '<li>Get your Template IDs from "Email Templates"</li>';
+        html += '<li>Get your Public Key from "Account" → "API Keys"</li>';
+        html += '<li>Update <code>ntc-evoting/.env</code> with real values</li>';
+        html += '<li>Restart dev server (Ctrl+C, then npm run dev)</li>';
+        html += '<li>Refresh this page and check again</li>';
+        html += '</ol>';
+      }
+
+      displayResults(html);
+    };
+
+    window.testEmail = async function() {
+      displayResults('<div class="status info">⏳ Testing email send...</div>');
+
+      try {
+        // Import EmailJS
+        const emailjs = (await import('https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js')).default;
+        
+        // Initialize
+        emailjs.init(config.publicKey);
+
+        // Test parameters
+        const testParams = {
+          to_email: 'test@example.com',
+          to_name: 'Test User',
+          verification_link: 'http://localhost:5174/verify-email?token=test123',
+          expiration_date: 'December 31, 2025',
+          from_name: 'NTC E-Voting System',
+        };
+
+        // Send test email
+        const response = await emailjs.send(
+          config.serviceId,
+          config.templateApproval,
+          testParams
+        );
+
+        let html = '<div class="status success">✅ Email sent successfully!</div>';
+        html += '<h3>Response:</h3>';
+        html += '<pre>' + JSON.stringify(response, null, 2) + '</pre>';
+        html += '<p>Check your email inbox (the one configured in EmailJS) for the test email.</p>';
+        displayResults(html);
+
+      } catch (error) {
+        let html = '<div class="status error">❌ Email send failed</div>';
+        html += '<h3>Error Details:</h3>';
+        html += '<pre>' + error.toString() + '</pre>';
+        
+        if (error.text) {
+          html += '<h3>Error Message:</h3>';
+          html += '<pre>' + error.text + '</pre>';
+        }
+
+        html += '<h3>Common Solutions:</h3>';
+        html += '<ul>';
+        
+        if (error.text && error.text.includes('public key')) {
+          html += '<li><strong>Public Key Error:</strong> Your public key is invalid. Get it from EmailJS Dashboard → Account → API Keys</li>';
+        }
+        
+        if (error.text && error.text.includes('service')) {
+          html += '<li><strong>Service ID Error:</strong> Your service ID is invalid. Get it from EmailJS Dashboard → Email Services</li>';
+        }
+        
+        if (error.text && error.text.includes('template')) {
+          html += '<li><strong>Template Error:</strong> Your template ID is invalid or template is missing required variables</li>';
+          html += '<li>Make sure your template has <code>{{to_email}}</code> in the "To Email" field</li>';
+          html += '<li>Make sure your template HTML includes: {{to_name}}, {{verification_link}}, {{expiration_date}}</li>';
+        }
+        
+        html += '<li>Verify your EmailJS account is verified (check your email)</li>';
+        html += '<li>Check EmailJS Dashboard → History for more details</li>';
+        html += '<li>Make sure you restarted the dev server after updating .env</li>';
+        html += '</ul>';
+
+        displayResults(html);
+      }
+    };
+
+    // Auto-check on load
+    window.checkConfig();
+  </script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Connection Test</title>
+</head>
+<body>
+    <h1>Firebase Connection Test</h1>
+    <button onclick="testConnection()">Test Firebase Connection</button>
+    <div id="result"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDxP8OKeam4rWvDwehGvo8vjSl15s0onfA",
+            authDomain: "ntc-evoting-website.firebaseapp.com",
+            projectId: "ntc-evoting-website",
+            storageBucket: "ntc-evoting-website.firebasestorage.app",
+            messagingSenderId: "1045454245972",
+            appId: "1:1045454245972:web:f5043498e0a965004f1dc1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.testConnection = async function() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Testing connection...</p>';
+
+            try {
+                // Test Authentication
+                const userCredential = await signInWithEmailAndPassword(auth, 'admin@ntc.edu.ph', 'Admin123!');
+                const user = userCredential.user;
+                
+                resultDiv.innerHTML += `<p style="color: green;">✓ Authentication successful!</p>`;
+                resultDiv.innerHTML += `<p>User ID: ${user.uid}</p>`;
+                resultDiv.innerHTML += `<p>Email: ${user.email}</p>`;
+
+                // Test Firestore
+                const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+                
+                if (adminDoc.exists()) {
+                    resultDiv.innerHTML += `<p style="color: green;">✓ Firestore connection successful!</p>`;
+                    resultDiv.innerHTML += `<p>Admin data: ${JSON.stringify(adminDoc.data())}</p>`;
+                } else {
+                    resultDiv.innerHTML += `<p style="color: orange;">⚠ Admin document not found in Firestore</p>`;
+                    resultDiv.innerHTML += `<p>Please add a document to the 'admins' collection with ID: ${user.uid}</p>`;
+                }
+
+            } catch (error) {
+                resultDiv.innerHTML += `<p style="color: red;">✗ Error: ${error.message}</p>`;
+                console.error(error);
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Email Verification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #003366;
+            border-bottom: 3px solid #003366;
+            padding-bottom: 10px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #003366;
+        }
+        button {
+            background: #003366;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #004488;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Email Verification Test Tool</h1>
+        
+        <div class="section">
+            <h3>Step 1: Check Firestore Rules</h3>
+            <p>This will test if you can read from the <code>email_verifications</code> collection.</p>
+            <button onclick="testFirestoreRules()">Test Firestore Access</button>
+            <div id="rulesResult"></div>
+        </div>
+
+        <div class="section">
+            <h3>Step 2: Check EmailJS Configuration</h3>
+            <p>This will verify your EmailJS credentials are loaded.</p>
+            <button onclick="testEmailJSConfig()">Check EmailJS Config</button>
+            <div id="emailjsResult"></div>
+        </div>
+
+        <div class="section">
+            <h3>Step 3: List Verification Tokens</h3>
+            <p>This will show all verification tokens in Firestore.</p>
+            <button onclick="listTokens()">List All Tokens</button>
+            <div id="tokensResult"></div>
+        </div>
+
+        <div class="section">
+            <h3>Step 4: Test Specific Token</h3>
+            <p>Enter a token to test if it's valid:</p>
+            <input type="text" id="tokenInput" placeholder="Enter token (e.g., 8sycvg0ehkvmiv9ubd2)">
+            <button onclick="testToken()">Test Token</button>
+            <div id="tokenResult"></div>
+        </div>
+
+        <div class="section">
+            <h3>Step 5: Test Email Sending</h3>
+            <p>Send a test email using EmailJS:</p>
+            <input type="email" id="testEmail" placeholder="Enter email address">
+            <button onclick="sendTestEmail()">Send Test Email</button>
+            <div id="emailResult"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+        import { getFirestore, collection, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDxP8OKeam4rWvDwehGvo8vjSl15s0onfA",
+            authDomain: "ntc-evoting-website.firebaseapp.com",
+            projectId: "ntc-evoting-website",
+            storageBucket: "ntc-evoting-website.firebasestorage.app",
+            messagingSenderId: "1045454245972",
+            appId: "1:1045454245972:web:f5043498e0a965004f1dc1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.db = db;
+        window.auth = auth;
+
+        // Check auth state
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                console.log('✅ Logged in as:', user.email);
+            } else {
+                console.log('⚠️ Not logged in. Some tests may fail.');
+                alert('⚠️ You need to be logged in to test. Please log in to your app first.');
+            }
+        });
+
+        window.testFirestoreRules = async function() {
+            const result = document.getElementById('rulesResult');
+            result.innerHTML = '<div class="info">Testing Firestore access...</div>';
+            
+            try {
+                const verificationsRef = collection(db, 'email_verifications');
+                const snapshot = await getDocs(verificationsRef);
+                
+                result.innerHTML = `<div class="success">
+                    ✅ Firestore rules are working!<br>
+                    Found ${snapshot.size} verification token(s) in database.
+                </div>`;
+            } catch (error) {
+                result.innerHTML = `<div class="error">
+                    ❌ Firestore access failed!<br>
+                    Error: ${error.message}<br><br>
+                    <strong>Solution:</strong> Deploy Firestore rules using:<br>
+                    <code>firebase deploy --only firestore:rules</code>
+                </div>`;
+            }
+        };
+
+        window.testEmailJSConfig = function() {
+            const result = document.getElementById('emailjsResult');
+            
+            // These would come from .env in the actual app
+            const config = {
+                serviceId: 'your_service_id_here',
+                approvalTemplate: 'your_approval_template_id_here',
+                rejectionTemplate: 'your_rejection_template_id_here',
+                publicKey: 'your_public_key_here'
+            };
+
+            const hasPlaceholders = Object.values(config).some(val => val.includes('your_') || val.includes('_here'));
+
+            if (hasPlaceholders) {
+                result.innerHTML = `<div class="error">
+                    ❌ EmailJS NOT configured!<br>
+                    Your .env file still has placeholder values.<br><br>
+                    <strong>Solution:</strong><br>
+                    1. Sign up at https://www.emailjs.com/<br>
+                    2. Get your Service ID, Template IDs, and Public Key<br>
+                    3. Update the .env file<br>
+                    4. Restart your dev server
+                </div>`;
+            } else {
+                result.innerHTML = `<div class="success">
+                    ✅ EmailJS appears to be configured!<br>
+                    Service ID: ${config.serviceId}<br>
+                    Approval Template: ${config.approvalTemplate}<br>
+                    Rejection Template: ${config.rejectionTemplate}
+                </div>`;
+            }
+        };
+
+        window.listTokens = async function() {
+            const result = document.getElementById('tokensResult');
+            result.innerHTML = '<div class="info">Loading tokens...</div>';
+            
+            try {
+                const verificationsRef = collection(db, 'email_verifications');
+                const snapshot = await getDocs(verificationsRef);
+                
+                if (snapshot.empty) {
+                    result.innerHTML = '<div class="info">No verification tokens found in database.</div>';
+                    return;
+                }
+
+                let html = '<div class="success"><strong>Found ' + snapshot.size + ' token(s):</strong><br><br>';
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const expired = data.expiresAt.toDate() < new Date();
+                    html += `
+                        <div style="margin: 10px 0; padding: 10px; background: white; border-radius: 5px;">
+                            <strong>Token:</strong> ${data.token}<br>
+                            <strong>Email:</strong> ${data.email}<br>
+                            <strong>Used:</strong> ${data.used ? '✅ Yes' : '❌ No'}<br>
+                            <strong>Expired:</strong> ${expired ? '⚠️ Yes' : '✅ No'}<br>
+                            <strong>Expires:</strong> ${data.expiresAt.toDate().toLocaleString()}
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                result.innerHTML = html;
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        };
+
+        window.testToken = async function() {
+            const token = document.getElementById('tokenInput').value.trim();
+            const result = document.getElementById('tokenResult');
+            
+            if (!token) {
+                result.innerHTML = '<div class="error">Please enter a token</div>';
+                return;
+            }
+
+            result.innerHTML = '<div class="info">Testing token...</div>';
+            
+            try {
+                const verificationsRef = collection(db, 'email_verifications');
+                const q = query(verificationsRef, where('token', '==', token));
+                const snapshot = await getDocs(q);
+                
+                if (snapshot.empty) {
+                    result.innerHTML = `<div class="error">
+                        ❌ Token not found in database!<br>
+                        Token: <code>${token}</code>
+                    </div>`;
+                    return;
+                }
+
+                const data = snapshot.docs[0].data();
+                const expired = data.expiresAt.toDate() < new Date();
+                const now = new Date();
+
+                let status = '✅ Valid';
+                let statusClass = 'success';
+                
+                if (data.used) {
+                    status = '⚠️ Already Used';
+                    statusClass = 'error';
+                } else if (expired) {
+                    status = '⚠️ Expired';
+                    statusClass = 'error';
+                }
+
+                result.innerHTML = `<div class="${statusClass}">
+                    <strong>Token Status:</strong> ${status}<br><br>
+                    <strong>Email:</strong> ${data.email}<br>
+                    <strong>Voter ID:</strong> ${data.voterId}<br>
+                    <strong>Created:</strong> ${data.createdAt.toDate().toLocaleString()}<br>
+                    <strong>Expires:</strong> ${data.expiresAt.toDate().toLocaleString()}<br>
+                    <strong>Used:</strong> ${data.used ? 'Yes' : 'No'}<br>
+                    <strong>Time Until Expiry:</strong> ${Math.round((data.expiresAt.toDate() - now) / 1000 / 60)} minutes
+                </div>`;
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        };
+
+        window.sendTestEmail = async function() {
+            const email = document.getElementById('testEmail').value.trim();
+            const result = document.getElementById('emailResult');
+            
+            if (!email) {
+                result.innerHTML = '<div class="error">Please enter an email address</div>';
+                return;
+            }
+
+            result.innerHTML = '<div class="info">This test requires EmailJS to be configured in your app.<br>Please test from the actual application instead.</div>';
+        };
+    </script>
+</body>
+</html>

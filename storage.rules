@@ -1,0 +1,32 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null &&
+             firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data.role in ['admin', 'super_admin'];
+    }
+    
+    // Verification documents
+    match /verification_docs/{voterId}/{fileName} {
+      // Allow upload during registration (anyone can upload to their own folder)
+      allow create: if request.auth == null || request.auth.uid == voterId;
+      
+      // Admins can read verification documents
+      allow read: if isAdmin();
+      
+      // No one can update or delete verification documents
+      allow update, delete: if false;
+    }
+    
+    // Candidate photos
+    match /candidate_photos/{electionId}/{candidateId}/{fileName} {
+      // Anyone authenticated can read candidate photos
+      allow read: if request.auth != null;
+      
+      // Only admins can upload/update/delete candidate photos
+      allow write: if isAdmin();
+    }
+  }
+}
