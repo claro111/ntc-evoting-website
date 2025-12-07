@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, getCountFromServer, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { approveVoter, rejectVoter } from '../services/voterService';
+import { approveVoter, rejectVoter, deleteVoterPermanently } from '../services/voterService';
 import './ManageVotersPage.css';
 
 const ManageVotersPage = () => {
@@ -553,8 +553,8 @@ const DeactivatedVotersTab = ({ voters, formatDate, onDeletePermanently }) => {
     try {
       setDeleting(selectedVoter.id);
 
-      const voterRef = doc(db, 'voters', selectedVoter.id);
-      await deleteDoc(voterRef);
+      // Call Cloud Function to delete both Firestore and Auth user
+      await deleteVoterPermanently(selectedVoter.id, selectedVoter.uid);
       
       alert(`${selectedVoter.fullName} has been permanently deleted from the system.`);
       setShowDeleteModal(false);

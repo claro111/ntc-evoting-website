@@ -187,3 +187,27 @@ export const verifyEmail = async (token) => {
     throw new Error(error.message || 'Failed to verify email');
   }
 };
+
+/**
+ * Permanently delete a voter (Firestore + Firebase Auth)
+ * @param {string} voterId - The voter document ID
+ * @param {string} uid - The Firebase Auth UID
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export const deleteVoterPermanently = async (voterId, uid) => {
+  try {
+    const { getFunctions, httpsCallable } = await import('firebase/functions');
+    const functions = getFunctions();
+    const deleteVoter = httpsCallable(functions, 'deleteVoterPermanently');
+    
+    const result = await deleteVoter({ voterId, uid });
+    
+    return {
+      success: true,
+      message: result.data.message,
+    };
+  } catch (error) {
+    console.error('Error permanently deleting voter:', error);
+    throw new Error(error.message || 'Failed to permanently delete voter');
+  }
+};
