@@ -553,10 +553,11 @@ const DeactivatedVotersTab = ({ voters, formatDate, onDeletePermanently }) => {
     try {
       setDeleting(selectedVoter.id);
 
-      // Call Cloud Function to delete both Firestore and Auth user
-      await deleteVoterPermanently(selectedVoter.id, selectedVoter.uid);
+      // Delete Firestore document
+      const voterRef = doc(db, 'voters', selectedVoter.id);
+      await deleteDoc(voterRef);
       
-      alert(`${selectedVoter.fullName} has been permanently deleted from the system.`);
+      alert(`${selectedVoter.fullName} has been permanently deleted from Firestore.\n\nNote: To also delete the Firebase Authentication user, go to Firebase Console → Authentication → Users and manually delete the user with email: ${selectedVoter.email}`);
       setShowDeleteModal(false);
       setSelectedVoter(null);
       
