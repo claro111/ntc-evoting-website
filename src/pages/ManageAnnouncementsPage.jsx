@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, addDoc, updateDoc, deleteDoc, doc, Timestamp, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import './ManageAnnouncementsPage.css';
 
 const ManageAnnouncementsPage = () => {
@@ -14,26 +14,29 @@ const ManageAnnouncementsPage = () => {
   const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
-    fetchAnnouncements();
-  }, []);
+    // Set up real-time listener for announcements
+    const announcementsRef = collection(db, 'announcements');
+    const q = query(announcementsRef, orderBy('createdAt', 'desc'));
+    
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const announcementsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setAnnouncements(announcementsData);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Error fetching announcements:', err);
+        setLoading(false);
+      }
+    );
 
-  const fetchAnnouncements = async () => {
-    try {
-      setLoading(true);
-      const announcementsRef = collection(db, 'announcements');
-      const q = query(announcementsRef, orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const announcementsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setAnnouncements(announcementsData);
-      setLoading(false);
-    } catch (err) {
-      console.error('Error fetching announcements:', err);
-      setLoading(false);
-    }
-  };
+    // Cleanup listener on unmount
+    return () => unsubscribe();
+  }, []);
 
   const handleClearForm = () => {
     setTitle('');
@@ -78,7 +81,7 @@ const ManageAnnouncementsPage = () => {
       }
 
       handleClearForm();
-      await fetchAnnouncements();
+      // No need to manually fetch - real-time listener will update automatically
       setSubmitting(false);
     } catch (err) {
       console.error('Error posting announcement:', err);
@@ -102,7 +105,7 @@ const ManageAnnouncementsPage = () => {
     try {
       await deleteDoc(doc(db, 'announcements', announcementId));
       alert('Announcement deleted successfully!');
-      await fetchAnnouncements();
+      // No need to manually fetch - real-time listener will update automatically
     } catch (err) {
       console.error('Error deleting announcement:', err);
       alert('Failed to delete announcement. Please try again.');
@@ -193,13 +196,23 @@ const ManageAnnouncementsPage = () => {
           >
             {submitting ? 'Posting...' : editingId ? 'Update Announcement' : 'Post Announcement'}
           </button>
-          <button
-            className="btn-clear"
-            onClick={handleClearForm}
-            disabled={submitting}
-          >
-            Clear Form
-          </button>
+          {editingId ? (
+            <button
+              className="btn-cancel"
+              onClick={handleClearForm}
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+          ) : (
+            <button
+              className="btn-clear"
+              onClick={handleClearForm}
+              disabled={submitting}
+            >
+              Clear Form
+            </button>
+          )}
         </div>
       </div>
 

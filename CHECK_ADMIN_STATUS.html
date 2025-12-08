@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check Admin Status - NTC E-Voting</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 40px;
+      max-width: 600px;
+      width: 100%;
+    }
+
+    h1 {
+      color: #1e3a8a;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #64748b;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .status-box {
+      background: #f8fafc;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .status-box.success {
+      background: #f0fdf4;
+      border-color: #86efac;
+    }
+
+    .status-box.error {
+      background: #fef2f2;
+      border-color: #fca5a5;
+    }
+
+    .status-box.warning {
+      background: #fffbeb;
+      border-color: #fde047;
+    }
+
+    .status-title {
+      font-weight: 600;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+
+    .status-box.success .status-title {
+      color: #16a34a;
+    }
+
+    .status-box.error .status-title {
+      color: #dc2626;
+    }
+
+    .status-box.warning .status-title {
+      color: #ca8a04;
+    }
+
+    .status-detail {
+      color: #475569;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .code {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+    }
+
+    button {
+      background: #1e3a8a;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #1e40af;
+    }
+
+    button:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    .loading {
+      text-align: center;
+      color: #64748b;
+      padding: 20px;
+    }
+
+    .spinner {
+      border: 3px solid #e2e8f0;
+      border-top: 3px solid #1e3a8a;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .info-list {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .info-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .info-list li:last-child {
+      border-bottom: none;
+    }
+
+    .label {
+      font-weight: 600;
+      color: #334155;
+      display: inline-block;
+      min-width: 120px;
+    }
+
+    .value {
+      color: #64748b;
+    }
+
+    .instructions {
+      background: #f1f5f9;
+      border-left: 4px solid #1e3a8a;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 4px;
+    }
+
+    .instructions h3 {
+      color: #1e3a8a;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+
+    .instructions ol {
+      margin-left: 20px;
+      color: #475569;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    .instructions li {
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Admin Status Checker</h1>
+    <p class="subtitle">Diagnose admin authentication and permissions issues</p>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Checking admin status...</p>
+    </div>
+
+    <div id="results" style="display: none;"></div>
+
+    <button id="recheckBtn" style="display: none;" onclick="location.reload()">
+      🔄 Check Again
+    </button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+    import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDxP8OKeam4rWvDwehGvo8vjSl15s0onfA",
+      authDomain: "ntc-evoting-website.firebaseapp.com",
+      projectId: "ntc-evoting-website",
+      storageBucket: "ntc-evoting-website.firebasestorage.app",
+      messagingSenderId: "1045454245972",
+      appId: "1:1045454245972:web:f5043498e0a965004f1dc1"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    async function checkAdminStatus() {
+      const loadingDiv = document.getElementById('loading');
+      const resultsDiv = document.getElementById('results');
+      const recheckBtn = document.getElementById('recheckBtn');
+
+      try {
+        // Wait for auth state
+        const user = await new Promise((resolve) => {
+          onAuthStateChanged(auth, (user) => resolve(user));
+        });
+
+        let html = '';
+
+        // Check 1: Authentication Status
+        if (!user) {
+          html += `
+            <div class="status-box error">
+              <div class="status-title">❌ Not Logged In</div>
+              <div class="status-detail">
+                You are not currently logged in to Firebase Authentication.
+              </div>
+            </div>
+
+            <div class="instructions">
+              <h3>📋 How to Fix:</h3>
+              <ol>
+                <li>Go to your admin login page: <span class="code">/admin/login</span></li>
+                <li>Sign in with your admin credentials</li>
+                <li>Return to this page and check again</li>
+              </ol>
+            </div>
+          `;
+        } else {
+          html += `
+            <div class="status-box success">
+              <div class="status-title">✅ Logged In</div>
+              <ul class="info-list">
+                <li><span class="label">User ID:</span> <span class="value code">${user.uid}</span></li>
+                <li><span class="label">Email:</span> <span class="value">${user.email}</span></li>
+                <li><span class="label">Email Verified:</span> <span class="value">${user.emailVerified ? '✅ Yes' : '❌ No'}</span></li>
+              </ul>
+            </div>
+          `;
+
+          // Check 2: Admin Document
+          try {
+            const adminRef = doc(db, 'admins', user.uid);
+            const adminDoc = await getDoc(adminRef);
+
+            if (!adminDoc.exists()) {
+              html += `
+                <div class="status-box error">
+                  <div class="status-title">❌ Admin Document Missing</div>
+                  <div class="status-detail">
+                    You are logged in, but there is no admin document in Firestore for your account.
+                    This is why you're getting "Missing or insufficient permissions" errors.
+                  </div>
+                </div>
+
+                <div class="instructions">
+                  <h3>📋 How to Fix:</h3>
+                  <ol>
+                    <li>Go to <strong>Firebase Console</strong> → <strong>Firestore Database</strong></li>
+                    <li>Create a collection called <span class="code">admins</span> (if it doesn't exist)</li>
+                    <li>Add a new document with ID: <span class="code">${user.uid}</span></li>
+                    <li>Add these fields:
+                      <ul style="margin-top: 8px;">
+                        <li><span class="code">email</span> (string): ${user.email}</li>
+                        <li><span class="code">name</span> (string): Your Name</li>
+                        <li><span class="code">role</span> (string): admin</li>
+                        <li><span class="code">createdAt</span> (timestamp): Current date/time</li>
+                        <li><span class="code">mfaEnabled</span> (boolean): false</li>
+                      </ul>
+                    </li>
+                    <li>Save the document</li>
+                    <li>Return to this page and check again</li>
+                  </ol>
+                </div>
+              `;
+            } else {
+              const adminData = adminDoc.data();
+              html += `
+                <div class="status-box success">
+                  <div class="status-title">✅ Admin Document Found</div>
+                  <ul class="info-list">
+                    <li><span class="label">Name:</span> <span class="value">${adminData.name || 'N/A'}</span></li>
+                    <li><span class="label">Email:</span> <span class="value">${adminData.email || 'N/A'}</span></li>
+                    <li><span class="label">Role:</span> <span class="value">${adminData.role || 'N/A'}</span></li>
+                    <li><span class="label">MFA Enabled:</span> <span class="value">${adminData.mfaEnabled ? 'Yes' : 'No'}</span></li>
+                  </ul>
+                </div>
+
+                <div class="status-box success">
+                  <div class="status-title">🎉 All Checks Passed!</div>
+                  <div class="status-detail">
+                    Your admin account is properly configured. You should be able to:
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                      <li>Add/edit/delete candidates</li>
+                      <li>Manage voters</li>
+                      <li>View dashboard statistics</li>
+                      <li>Access all admin features</li>
+                    </ul>
+                  </div>
+                  <div class="status-detail" style="margin-top: 15px;">
+                    <strong>If you're still getting permission errors:</strong>
+                    <ul style="margin-top: 8px; margin-left: 20px;">
+                      <li>Try logging out and logging back in</li>
+                      <li>Clear your browser cache</li>
+                      <li>Check that Firestore rules are deployed: <span class="code">firebase deploy --only firestore:rules</span></li>
+                    </ul>
+                  </div>
+                </div>
+              `;
+            }
+          } catch (error) {
+            html += `
+              <div class="status-box error">
+                <div class="status-title">❌ Error Checking Admin Document</div>
+                <div class="status-detail">
+                  <strong>Error:</strong> ${error.message}
+                </div>
+                <div class="status-detail" style="margin-top: 10px;">
+                  This could mean:
+                  <ul style="margin-top: 8px; margin-left: 20px;">
+                    <li>Firestore rules are blocking access</li>
+                    <li>Firebase configuration is incorrect</li>
+                    <li>Network connectivity issues</li>
+                  </ul>
+                </div>
+              </div>
+            `;
+          }
+        }
+
+        loadingDiv.style.display = 'none';
+        resultsDiv.innerHTML = html;
+        resultsDiv.style.display = 'block';
+        recheckBtn.style.display = 'block';
+
+      } catch (error) {
+        loadingDiv.style.display = 'none';
+        resultsDiv.innerHTML = `
+          <div class="status-box error">
+            <div class="status-title">❌ Error</div>
+            <div class="status-detail">
+              <strong>Error:</strong> ${error.message}
+            </div>
+          </div>
+        `;
+        resultsDiv.style.display = 'block';
+        recheckBtn.style.display = 'block';
+      }
+    }
+
+    // Run check on page load
+    checkAdminStatus();
+  </script>
+</body>
+</html>

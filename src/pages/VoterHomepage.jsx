@@ -1,43 +1,60 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { doc, getDoc, collection, query, where, limit, onSnapshot } from 'firebase/firestore';
-import { db, auth } from '../config/firebase';
-import CountdownTimer from '../components/CountdownTimer';
-import CandidateCard from '../components/CandidateCard';
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import FloatingCountdownTimer from '../components/FloatingCountdownTimer';
+import PositionTabs from '../components/PositionTabs';
+import CandidateCarousel from '../components/CandidateCarousel';
+import CandidateDetailModal from '../components/CandidateDetailModal';
+import FloatingBottomNavbar from '../components/FloatingBottomNavbar';
+import Logo from '../components/Logo';
+import './VoterHomepage.css';
 
 const VoterHomepage = () => {
   const navigate = useNavigate();
   const [election, setElection] = useState(null);
   const [votingStatus, setVotingStatus] = useState('closed'); // 'closed', 'active', 'upcoming'
-  const [featuredCandidate, setFeaturedCandidate] = useState(null);
+  const [positions, setPositions] = useState([]);
+  const [candidates, setCandidates] = useState([]);
+  const [selectedPosition, setSelectedPosition] = useState(null);
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [winners, setWinners] = useState([]);
+  const [resultsPublished, setResultsPublished] = useState(false);
 
   useEffect(() => {
+    console.log('VoterHomepage: Setting up real-time listeners');
+
     // Set up real-time listener for elections
     const electionsRef = collection(db, 'elections');
+    // Query for current election (can be active, closed, or draft)
     const activeElectionQuery = query(
       electionsRef,
-      where('status', 'in', ['active', 'draft']),
-      limit(1)
+      where('status', 'in', ['active', 'closed', 'draft'])
     );
-    
-    const unsubscribe = onSnapshot(
+
+    const unsubscribeElection = onSnapshot(
       activeElectionQuery,
       (snapshot) => {
         if (!snapshot.empty) {
           const electionData = {
             id: snapshot.docs[0].id,
-            ...snapshot.docs[0].data()
+            ...snapshot.docs[0].data(),
           };
-          
+
           setElection(electionData);
-          
+          const published = electionData.resultsPublished || false;
+          console.log('VoterHomepage - Election Data:', electionData);
+          console.log('VoterHomepage - Results Published Flag:', published);
+          setResultsPublished(published);
+
           // Determine voting status
           const now = new Date();
           const startTime = electionData.startTime?.toDate();
           const endTime = electionData.endTime?.toDate();
-          
+
           if (electionData.status === 'active' && startTime && endTime) {
             if (now >= startTime && now <= endTime) {
               setVotingStatus('active');
@@ -49,15 +66,11 @@ const VoterHomepage = () => {
           } else {
             setVotingStatus('closed');
           }
-          
-          // Fetch featured candidate
-          fetchFeaturedCandidate(electionData.id);
         } else {
           setElection(null);
           setVotingStatus('closed');
-          setFeaturedCandidate(null);
         }
-        
+
         setLoading(false);
       },
       (err) => {
@@ -67,46 +80,70 @@ const VoterHomepage = () => {
       }
     );
 
-    // Cleanup listener on unmount
-    return () => unsubscribe();
+    // Set up real-time listener for positions
+    const unsubscribePositions = onSnapshot(
+      collection(db, 'positions'),
+      (snapshot) => {
+        console.log('Positions updated:', snapshot.size);
+        const positionsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        const sortedPositions = positionsData.sort((a, b) => (a.order || 0) - (b.order || 0));
+        setPositions(sortedPositions);
+        
+        // Set first position as default if not already set
+        if (sortedPositions.length > 0 && !selectedPosition) {
+          setSelectedPosition(sortedPositions[0].name);
+        }
+      },
+      (error) => {
+        console.error('Error in positions listener:', error);
+      }
+    );
+
+    // Set up real-time listener for candidates
+    const unsubscribeCandidates = onSnapshot(
+      collection(db, 'candidates'),
+      (snapshot) => {
+        console.log('Candidates updated:', snapshot.size);
+        const candidatesData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setCandidates(candidatesData);
+      },
+      (error) => {
+        console.error('Error in candidates listener:', error);
+      }
+    );
+
+    // Cleanup listeners on unmount
+    return () => {
+      console.log('VoterHomepage: Cleaning up listeners');
+      unsubscribeElection();
+      unsubscribePositions();
+      unsubscribeCandidates();
+    };
   }, []);
 
-  const fetchFeaturedCandidate = async (electionId) => {
-    try {
-      const candidatesRef = collection(db, 'candidates');
-      const candidateQuery = query(
-        candidatesRef,
-        where('electionId', '==', electionId),
-        limit(1)
-      );
-      
-      const candidateSnapshot = await getDocs(candidateQuery);
-      
-      if (!candidateSnapshot.empty) {
-        const candidateData = {
-          id: candidateSnapshot.docs[0].id,
-          ...candidateSnapshot.docs[0].data()
-        };
-        
-        // Fetch position name
-        if (candidateData.positionId) {
-          const positionDoc = await getDoc(doc(db, 'positions', candidateData.positionId));
-          if (positionDoc.exists()) {
-            candidateData.positionName = positionDoc.data().name;
-          }
-        }
-        
-        setFeaturedCandidate(candidateData);
-      }
-    } catch (err) {
-      console.error('Error fetching featured candidate:', err);
-    }
+  // No longer need winners calculation - will show top 3 per position instead
+  useEffect(() => {
+    console.log('VoterHomepage - Results Published:', resultsPublished);
+  }, [resultsPublished]);
+
+  const handleSeeMore = (candidate) => {
+    setSelectedCandidate(candidate);
+    setIsModalOpen(true);
   };
 
-  const handleVoteNowClick = () => {
-    if (votingStatus === 'active') {
-      navigate('/voter/voting');
-    }
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedCandidate(null);
+  };
+
+  const handleSelectPosition = (position) => {
+    setSelectedPosition(position);
   };
 
   const getTargetDate = () => {
@@ -121,14 +158,33 @@ const VoterHomepage = () => {
     return null;
   };
 
-  const getCurrentDate = () => {
-    const now = new Date();
-    return now.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+  // Filter candidates by selected position
+  const getFilteredCandidates = () => {
+    if (!selectedPosition) {
+      return [];
+    }
+    const positionCandidates = candidates.filter((c) => c.position === selectedPosition);
+    
+    // If results are published, sort by vote count and return top 3 with winner flag
+    if (resultsPublished) {
+      const sorted = [...positionCandidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+      const top3 = sorted.slice(0, 3).map((candidate, index) => ({
+        ...candidate,
+        isWinner: true,
+        rank: index + 1,
+        position: selectedPosition
+      }));
+      
+      // Reorder: [2nd place (left), 1st place (center), 3rd place (right)]
+      if (top3.length === 3) {
+        return [top3[1], top3[0], top3[2]]; // 2nd, 1st, 3rd
+      } else if (top3.length === 2) {
+        return [top3[1], top3[0]]; // 2nd, 1st
+      }
+      return top3;
+    }
+    
+    return positionCandidates;
   };
 
   if (loading) {
@@ -152,76 +208,60 @@ const VoterHomepage = () => {
     );
   }
 
+  const filteredCandidates = getFilteredCandidates();
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Header */}
-      <div className="bg-blue-600 text-white p-6">
-        <h1 className="text-2xl font-bold">NTC E-Voting</h1>
-        <p className="text-blue-100 mt-1">Welcome to the voting system</p>
-      </div>
+    <div className="voter-homepage">
+      {/* Logo */}
+      <Logo />
+      
+      {/* Floating Countdown Timer */}
+      <FloatingCountdownTimer targetDate={getTargetDate()} votingStatus={votingStatus} />
 
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
-        {/* Voting Status Message */}
-        {votingStatus === 'closed' && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-            <p className="text-red-800 font-semibold">Voting is closed</p>
-            <p className="text-red-600 text-sm mt-1">
-              There are no active elections at this time
-            </p>
-          </div>
-        )}
-
-        {votingStatus === 'upcoming' && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-            <p className="text-yellow-800 font-semibold">Voting is closed</p>
-            <p className="text-yellow-600 text-sm mt-1">
-              Voting will begin soon
-            </p>
-          </div>
-        )}
-
-        {/* Countdown Timer */}
-        {(votingStatus === 'upcoming' || votingStatus === 'active') && getTargetDate() && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 text-center">
-              {votingStatus === 'upcoming' ? 'Voting starts in:' : 'Voting ends in:'}
-            </h2>
-            <CountdownTimer targetDate={getTargetDate()} votingStatus={votingStatus} />
-          </div>
-        )}
-
-        {/* Featured Candidate */}
-        {featuredCandidate && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Featured Candidate</h2>
-            <CandidateCard candidate={featuredCandidate} />
-          </div>
-        )}
-
-        {/* Vote Now Button */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <button
-            onClick={handleVoteNowClick}
-            disabled={votingStatus !== 'active'}
-            className={`w-full py-4 rounded-lg font-semibold text-lg transition-colors ${
-              votingStatus === 'active'
-                ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            Vote Now
-          </button>
-          <p className="text-center text-gray-500 text-sm mt-2">{getCurrentDate()}</p>
+      {/* Position Tabs - Always show */}
+      {resultsPublished && (
+        <div className="results-header">
+          <h2 className="results-title">🏆 Election Results - Top 3 Per Position 🏆</h2>
         </div>
+      )}
+      <PositionTabs
+        positions={positions}
+        selectedPosition={selectedPosition}
+        onSelectPosition={handleSelectPosition}
+      />
 
-        {/* Election Info */}
-        {election && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-2">{election.title}</h2>
-            <p className="text-gray-600 text-sm">{election.description}</p>
+      {/* Main Content */}
+      <div className="homepage-content">
+        {loading ? (
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p className="loading-text">Loading candidates...</p>
           </div>
-        )}
+        ) : error ? (
+          <div className="error-container">
+            <p className="error-text">{error}</p>
+          </div>
+        ) : (
+          <div className="positions-container">
+            <div className="position-section">
+              <CandidateCarousel
+                candidates={filteredCandidates}
+                onSeeMore={handleSeeMore}
+              />
+            </div>
+        </div>
+      )}
       </div>
+
+      {/* Candidate Detail Modal */}
+      <CandidateDetailModal
+        candidate={selectedCandidate}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+      />
+
+      {/* Floating Bottom Navbar */}
+      <FloatingBottomNavbar />
     </div>
   );
 };

@@ -1,47 +1,35 @@
 .admin-login-container {
   min-height: 100vh;
-  background-image: url('https://images.unsplash.com/photo-1562774053-701939374585?q=80&w=2000');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background: linear-gradient(135deg, #a8d5ff 0%, #d4e9ff 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
-  position: relative;
-}
-
-.admin-login-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(30, 58, 138, 0.3);
-  z-index: 1;
 }
 
 .admin-login-card {
   background: white;
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   padding: 40px;
   width: 100%;
   max-width: 400px;
-  position: relative;
-  z-index: 2;
 }
 
-.admin-login-logo {
-  text-align: center;
-  margin-bottom: 30px;
+.admin-login-card .admin-login-logo {
+  position: static !important;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+  background: transparent;
+  padding: 0;
+  z-index: auto;
 }
 
-.admin-login-logo img {
-  width: 80px;
-  height: 80px;
-  margin-bottom: 15px;
+.admin-login-card .admin-login-logo img {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
 }
 
 .admin-login-title {
@@ -55,7 +43,7 @@
 .admin-login-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 6px;
 }
 
 .admin-form-group {
@@ -95,7 +83,8 @@
 
 .admin-forgot-password {
   text-align: right;
-  margin-top: -10px;
+  margin-top: 8px;
+  margin-bottom: 12px;
 }
 
 .admin-forgot-link {
@@ -103,6 +92,10 @@
   font-size: 14px;
   text-decoration: none;
   font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
 }
 
 .admin-forgot-link:hover {
@@ -128,4 +121,19 @@
 .admin-signin-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .admin-login-card .admin-login-logo img {
+    width: 100px;
+    height: 100px;
+  }
+
+  .admin-login-card {
+    padding: 30px 20px;
+  }
+  
+  .admin-login-title {
+    font-size: 20px;
+  }
 }

@@ -93,7 +93,8 @@
 }
 
 .btn-post,
-.btn-clear {
+.btn-clear,
+.btn-cancel {
   padding: 0.75rem 1.5rem;
   border: none;
   border-radius: 6px;
@@ -121,8 +122,19 @@
   background-color: #cbd5e0;
 }
 
+.btn-cancel {
+  background-color: #f56565;
+  color: white;
+  max-width: 150px;
+}
+
+.btn-cancel:hover:not(:disabled) {
+  background-color: #e53e3e;
+}
+
 .btn-post:disabled,
-.btn-clear:disabled {
+.btn-clear:disabled,
+.btn-cancel:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -306,7 +318,8 @@
   }
 
   .btn-post,
-  .btn-clear {
+  .btn-clear,
+  .btn-cancel {
     width: 100%;
   }
 

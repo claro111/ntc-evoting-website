@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, doc, addDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import './ManageCandidatesPage.css';
 
 const ManageCandidatesPage = () => {
@@ -327,8 +329,12 @@ const CandidatesTab = ({ candidates, positions, positionFilter, onFilterChange, 
                     </div>
                     <div className="candidate-info">
                       <h3>{candidate.name}</h3>
-                      <p className="candidate-partylist">{candidate.partylist || 'Independent'}</p>
-                      <p className="candidate-description">{candidate.description}</p>
+                      {candidate.bio && (
+                        <div className="candidate-bio" dangerouslySetInnerHTML={{ __html: candidate.bio }} />
+                      )}
+                      {candidate.platform && (
+                        <div className="candidate-platform" dangerouslySetInnerHTML={{ __html: candidate.platform }} />
+                      )}
                     </div>
                     <div className="candidate-actions">
                       <button className="btn-edit" onClick={() => onEdit(candidate)}>
@@ -455,8 +461,8 @@ const CandidateFormModal = ({ candidate, positions, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     name: candidate?.name || '',
     position: candidate?.position || '',
-    partylist: candidate?.partylist || '',
-    description: candidate?.description || '',
+    bio: candidate?.bio || '<p><br></p>',
+    platform: candidate?.platform || '<p><br></p>',
   });
   const [photoFile, setPhotoFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -465,6 +471,14 @@ const CandidateFormModal = ({ candidate, positions, onClose, onSuccess }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleBioChange = (value) => {
+    setFormData((prev) => ({ ...prev, bio: value }));
+  };
+
+  const handlePlatformChange = (value) => {
+    setFormData((prev) => ({ ...prev, platform: value }));
   };
 
   const handlePhotoChange = (e) => {
@@ -497,8 +511,8 @@ const CandidateFormModal = ({ candidate, positions, onClose, onSuccess }) => {
       const candidateData = {
         name: formData.name,
         position: formData.position,
-        partylist: formData.partylist,
-        description: formData.description,
+        bio: formData.bio,
+        platform: formData.platform,
         photoUrl: photoUrl,
       };
 
@@ -568,27 +582,41 @@ const CandidateFormModal = ({ candidate, positions, onClose, onSuccess }) => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Partylist:</label>
-              <input
-                type="text"
-                name="partylist"
-                className="form-input"
-                value={formData.partylist}
-                onChange={handleChange}
-                placeholder="e.g., Unity Party (optional)"
-              />
+              <label className="form-label">Full Bio:</label>
+              <div className="quill-wrapper">
+                <ReactQuill
+                  theme="snow"
+                  value={formData.bio || ''}
+                  onChange={handleBioChange}
+                  placeholder="Enter candidate's full biography..."
+                  modules={{
+                    toolbar: [
+                      ['bold', 'italic', 'underline'],
+                      [{ list: 'ordered' }, { list: 'bullet' }],
+                      ['clean'],
+                    ],
+                  }}
+                />
+              </div>
             </div>
 
             <div className="form-group">
-              <label className="form-label">Description:</label>
-              <textarea
-                name="description"
-                className="form-textarea"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Brief description or platform"
-                rows="4"
-              />
+              <label className="form-label">Platform:</label>
+              <div className="quill-wrapper">
+                <ReactQuill
+                  theme="snow"
+                  value={formData.platform || ''}
+                  onChange={handlePlatformChange}
+                  placeholder="Enter candidate's platform..."
+                  modules={{
+                    toolbar: [
+                      ['bold', 'italic', 'underline'],
+                      [{ list: 'ordered' }, { list: 'bullet' }],
+                      ['clean'],
+                    ],
+                  }}
+                />
+              </div>
             </div>
 
             <div className="form-group">

@@ -70,36 +70,7 @@ const AdminLoginPage = () => {
       <div className="admin-login-card">
         {/* Logo */}
         <div className="admin-login-logo">
-          <svg
-            width="80"
-            height="80"
-            viewBox="0 0 100 100"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <circle cx="50" cy="50" r="48" fill="#1e3a8a" stroke="#fbbf24" strokeWidth="2" />
-            <circle cx="50" cy="50" r="35" fill="#fbbf24" />
-            <circle cx="50" cy="50" r="20" fill="#1e3a8a" />
-            <circle cx="50" cy="50" r="8" fill="#fbbf24" />
-            {[...Array(8)].map((_, i) => {
-              const angle = (i * 45 * Math.PI) / 180;
-              const x1 = 50 + 20 * Math.cos(angle);
-              const y1 = 50 + 20 * Math.sin(angle);
-              const x2 = 50 + 35 * Math.cos(angle);
-              const y2 = 50 + 35 * Math.sin(angle);
-              return (
-                <line
-                  key={i}
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
-                  stroke="#1e3a8a"
-                  strokeWidth="2"
-                />
-              );
-            })}
-          </svg>
+          <img src="/ntc-logo.png" alt="NTC Logo" />
         </div>
 
         {/* Title */}

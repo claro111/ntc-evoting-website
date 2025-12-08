@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug Candidate Sync - NTC E-Voting</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: #1e3a8a;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #64748b;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .section {
+      background: #f8fafc;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .section.success {
+      background: #f0fdf4;
+      border-color: #86efac;
+    }
+
+    .section.error {
+      background: #fef2f2;
+      border-color: #fca5a5;
+    }
+
+    .section.warning {
+      background: #fffbeb;
+      border-color: #fde047;
+    }
+
+    .section-title {
+      font-weight: 600;
+      margin-bottom: 15px;
+      font-size: 18px;
+      color: #1e3a8a;
+    }
+
+    .info-row {
+      padding: 10px 0;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .label {
+      font-weight: 600;
+      color: #334155;
+    }
+
+    .value {
+      color: #64748b;
+      font-family: 'Courier New', monospace;
+    }
+
+    .code {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 15px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+
+    button {
+      background: #1e3a8a;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #1e40af;
+    }
+
+    button:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    .loading {
+      text-align: center;
+      color: #64748b;
+      padding: 20px;
+    }
+
+    .spinner {
+      border: 3px solid #e2e8f0;
+      border-top: 3px solid #1e3a8a;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .candidate-item {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 10px 0;
+    }
+
+    .candidate-name {
+      font-weight: 600;
+      color: #1e3a8a;
+      font-size: 16px;
+    }
+
+    .candidate-position {
+      color: #64748b;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-badge.success {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .status-badge.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .status-badge.warning {
+      background: #fef3c7;
+      color: #92400e;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Debug Candidate Sync</h1>
+    <p class="subtitle">Diagnose why candidates aren't showing on voter website</p>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Checking your setup...</p>
+    </div>
+
+    <div id="results" style="display: none;"></div>
+
+    <button id="recheckBtn" style="display: none;" onclick="location.reload()">
+      🔄 Check Again
+    </button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+    import { getFirestore, collection, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDxP8OKeam4rWvDwehGvo8vjSl15s0onfA",
+      authDomain: "ntc-evoting-website.firebaseapp.com",
+      projectId: "ntc-evoting-website",
+      storageBucket: "ntc-evoting-website.firebasestorage.app",
+      messagingSenderId: "1045454245972",
+      appId: "1:1045454245972:web:f5043498e0a965004f1dc1"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    async function debugCandidateSync() {
+      const loadingDiv = document.getElementById('loading');
+      const resultsDiv = document.getElementById('results');
+      const recheckBtn = document.getElementById('recheckBtn');
+
+      try {
+        let html = '';
+
+        // Check 1: Authentication Status
+        const user = await new Promise((resolve) => {
+          onAuthStateChanged(auth, (user) => resolve(user));
+        });
+
+        if (!user) {
+          html += `
+            <div class="section error">
+              <div class="section-title">❌ Not Logged In</div>
+              <p>You are not logged in. Firestore rules require authentication to read candidates.</p>
+              <p style="margin-top: 10px;"><strong>Solution:</strong> Log in to the voter website first, then run this diagnostic again.</p>
+            </div>
+          `;
+        } else {
+          html += `
+            <div class="section success">
+              <div class="section-title">✅ Logged In</div>
+              <div class="info-row">
+                <span class="label">User ID:</span>
+                <span class="value">${user.uid}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Email:</span>
+                <span class="value">${user.email}</span>
+              </div>
+            </div>
+          `;
+
+          // Check 2: Positions
+          try {
+            const positionsRef = collection(db, 'positions');
+            const positionsSnapshot = await getDocs(positionsRef);
+            const positions = positionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            if (positions.length === 0) {
+              html += `
+                <div class="section error">
+                  <div class="section-title">❌ No Positions Found</div>
+                  <p>There are no positions in the database. Candidates need positions to be assigned to.</p>
+                  <p style="margin-top: 10px;"><strong>Solution:</strong></p>
+                  <ol style="margin-left: 20px; margin-top: 10px;">
+                    <li>Go to Admin Panel → Manage Candidates</li>
+                    <li>Click on "Positions" tab</li>
+                    <li>Add positions like "President", "Vice President", etc.</li>
+                  </ol>
+                </div>
+              `;
+            } else {
+              html += `
+                <div class="section success">
+                  <div class="section-title">✅ Positions Found (${positions.length})</div>
+                  ${positions.map(pos => `
+                    <div class="info-row">
+                      <span class="label">${pos.name}</span>
+                      <span class="value">Max Selection: ${pos.maxSelection || 1}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              `;
+            }
+
+            // Check 3: Candidates
+            try {
+              const candidatesRef = collection(db, 'candidates');
+              const candidatesSnapshot = await getDocs(candidatesRef);
+              const candidates = candidatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+              if (candidates.length === 0) {
+                html += `
+                  <div class="section error">
+                    <div class="section-title">❌ No Candidates Found</div>
+                    <p>There are no candidates in the database.</p>
+                    <p style="margin-top: 10px;"><strong>Solution:</strong></p>
+                    <ol style="margin-left: 20px; margin-top: 10px;">
+                      <li>Go to Admin Panel → Manage Candidates</li>
+                      <li>Click "Add Candidate"</li>
+                      <li>Fill in all fields (name, position, bio, platform)</li>
+                      <li>Click "Save"</li>
+                    </ol>
+                  </div>
+                `;
+              } else {
+                html += `
+                  <div class="section success">
+                    <div class="section-title">✅ Candidates Found (${candidates.length})</div>
+                    ${candidates.map(candidate => `
+                      <div class="candidate-item">
+                        <div class="candidate-name">${candidate.name}</div>
+                        <div class="candidate-position">Position: ${candidate.position || 'NOT SET'}</div>
+                        <div style="margin-top: 10px;">
+                          <span class="status-badge ${candidate.position ? 'success' : 'error'}">
+                            ${candidate.position ? '✓ Position Set' : '✗ No Position'}
+                          </span>
+                          <span class="status-badge ${candidate.photoUrl ? 'success' : 'warning'}">
+                            ${candidate.photoUrl ? '✓ Has Photo' : '⚠ No Photo'}
+                          </span>
+                          <span class="status-badge ${candidate.bio ? 'success' : 'warning'}">
+                            ${candidate.bio ? '✓ Has Bio' : '⚠ No Bio'}
+                          </span>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                `;
+
+                // Check 4: Position Name Matching
+                const positionNames = positions.map(p => p.name);
+                const candidatePositions = [...new Set(candidates.map(c => c.position))];
+                const unmatchedPositions = candidatePositions.filter(cp => cp && !positionNames.includes(cp));
+
+                if (unmatchedPositions.length > 0) {
+                  html += `
+                    <div class="section warning">
+                      <div class="section-title">⚠️ Position Name Mismatch</div>
+                      <p>Some candidates have positions that don't match any position in the database:</p>
+                      <div class="code">${unmatchedPositions.join(', ')}</div>
+                      <p style="margin-top: 10px;"><strong>Available Positions:</strong></p>
+                      <div class="code">${positionNames.join(', ')}</div>
+                      <p style="margin-top: 10px;"><strong>Solution:</strong> Make sure candidate positions match position names exactly (case-sensitive).</p>
+                    </div>
+                  `;
+                } else {
+                  html += `
+                    <div class="section success">
+                      <div class="section-title">✅ Position Names Match</div>
+                      <p>All candidate positions match available positions.</p>
+                    </div>
+                  `;
+                }
+              }
+            } catch (err) {
+              html += `
+                <div class="section error">
+                  <div class="section-title">❌ Error Reading Candidates</div>
+                  <p><strong>Error:</strong> ${err.message}</p>
+                  <p style="margin-top: 10px;">This usually means:</p>
+                  <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li>Firestore rules are blocking access</li>
+                    <li>You don't have permission to read candidates</li>
+                  </ul>
+                  <p style="margin-top: 10px;"><strong>Solution:</strong> Make sure you're logged in as a voter (not admin).</p>
+                </div>
+              `;
+            }
+          } catch (err) {
+            html += `
+              <div class="section error">
+                <div class="section-title">❌ Error Reading Positions</div>
+                <p><strong>Error:</strong> ${err.message}</p>
+              </div>
+            `;
+          }
+
+          // Check 5: Elections
+          try {
+            const electionsRef = collection(db, 'elections');
+            const activeElectionQuery = query(electionsRef, where('status', '==', 'active'));
+            const electionsSnapshot = await getDocs(activeElectionQuery);
+
+            if (electionsSnapshot.empty) {
+              html += `
+                <div class="section warning">
+                  <div class="section-title">⚠️ No Active Election</div>
+                  <p>There is no active election. The voting page requires an active election to display candidates.</p>
+                  <p style="margin-top: 10px;"><strong>Note:</strong> The homepage should still show featured candidates even without an active election.</p>
+                  <p style="margin-top: 10px;"><strong>Solution (for voting page):</strong></p>
+                  <ol style="margin-left: 20px; margin-top: 10px;">
+                    <li>Go to Admin Panel → Voting Control</li>
+                    <li>Create an election</li>
+                    <li>Set status to "active"</li>
+                    <li>Set start and end dates</li>
+                  </ol>
+                </div>
+              `;
+            } else {
+              const election = { id: electionsSnapshot.docs[0].id, ...electionsSnapshot.docs[0].data() };
+              html += `
+                <div class="section success">
+                  <div class="section-title">✅ Active Election Found</div>
+                  <div class="info-row">
+                    <span class="label">Title:</span>
+                    <span class="value">${election.title || 'N/A'}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Status:</span>
+                    <span class="value">${election.status}</span>
+                  </div>
+                </div>
+              `;
+            }
+          } catch (err) {
+            html += `
+              <div class="section error">
+                <div class="section-title">❌ Error Reading Elections</div>
+                <p><strong>Error:</strong> ${err.message}</p>
+              </div>
+            `;
+          }
+        }
+
+        // Summary
+        html += `
+          <div class="section" style="background: #f1f5f9; border-color: #cbd5e1;">
+            <div class="section-title">📋 Summary</div>
+            <p><strong>Next Steps:</strong></p>
+            <ol style="margin-left: 20px; margin-top: 10px; line-height: 1.8;">
+              <li>Make sure you're logged in as a voter</li>
+              <li>Create positions in admin panel if none exist</li>
+              <li>Add candidates and assign them to positions</li>
+              <li>Make sure position names match exactly (case-sensitive)</li>
+              <li>Create an active election for the voting page to work</li>
+              <li>Refresh the voter website pages</li>
+            </ol>
+          </div>
+        `;
+
+        loadingDiv.style.display = 'none';
+        resultsDiv.innerHTML = html;
+        resultsDiv.style.display = 'block';
+        recheckBtn.style.display = 'block';
+
+      } catch (error) {
+        loadingDiv.style.display = 'none';
+        resultsDiv.innerHTML = `
+          <div class="section error">
+            <div class="section-title">❌ Error</div>
+            <p><strong>Error:</strong> ${error.message}</p>
+          </div>
+        `;
+        resultsDiv.style.display = 'block';
+        recheckBtn.style.display = 'block';
+      }
+    }
+
+    // Run diagnostic on page load
+    debugCandidateSync();
+  </script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+/* Candidate Bio Preview Styles */
+.candidate-bio-preview {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.candidate-bio-preview p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.candidate-bio-preview strong {
+  font-weight: 600;
+}
+
+.candidate-bio-preview em {
+  font-style: italic;
+}
+
+.candidate-bio-preview ul,
+.candidate-bio-preview ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.candidate-bio-preview li {
+  margin: 0;
+}

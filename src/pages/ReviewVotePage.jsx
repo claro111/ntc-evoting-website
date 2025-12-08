@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp, query, where, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
+import Logo from '../components/Logo';
+import FloatingBottomNavbar from '../components/FloatingBottomNavbar';
+import FloatingCountdownTimer from '../components/FloatingCountdownTimer';
+import './ReviewVotePage.css';
 
 const ReviewVotePage = () => {
   const navigate = useNavigate();
@@ -9,6 +13,7 @@ const ReviewVotePage = () => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [election, setElection] = useState(null);
 
   useEffect(() => {
     // Retrieve selected votes from sessionStorage
@@ -21,10 +26,32 @@ const ReviewVotePage = () => {
     }
   }, [navigate]);
 
+  useEffect(() => {
+    // Set up real-time listener for active election
+    const electionsRef = collection(db, 'elections');
+    const activeElectionQuery = query(electionsRef, where('status', '==', 'active'));
+
+    const unsubscribeElection = onSnapshot(activeElectionQuery, (electionSnapshot) => {
+      if (!electionSnapshot.empty) {
+        const electionData = {
+          id: electionSnapshot.docs[0].id,
+          ...electionSnapshot.docs[0].data(),
+        };
+        setElection(electionData);
+      } else {
+        setElection(null);
+      }
+    });
+
+    return () => {
+      unsubscribeElection();
+    };
+  }, []);
+
   const groupByPosition = () => {
     const grouped = {};
     selectedCandidates.forEach((candidate) => {
-      const positionName = candidate.positionName || 'Unknown Position';
+      const positionName = candidate.position || candidate.positionName || 'Unknown Position';
       if (!grouped[positionName]) {
         grouped[positionName] = [];
       }
@@ -33,12 +60,39 @@ const ReviewVotePage = () => {
     return grouped;
   };
 
-  const handleBackToVoting = () => {
-    navigate('/voter/voting');
-  };
-
   const handleConfirmSubmit = () => {
     setShowConfirmDialog(true);
+  };
+
+  const getTargetDate = () => {
+    if (!election) return null;
+    
+    const now = new Date();
+    const startTime = election.startTime?.toDate();
+    const endTime = election.endTime?.toDate();
+
+    if (startTime && now < startTime) {
+      return startTime;
+    } else if (endTime && now < endTime) {
+      return endTime;
+    }
+    
+    return null;
+  };
+
+  const getVotingStatus = () => {
+    if (!election) return 'closed';
+    
+    const now = new Date();
+    const startTime = election.startTime?.toDate();
+    const endTime = election.endTime?.toDate();
+
+    if (startTime && endTime) {
+      if (now < startTime) return 'upcoming';
+      if (now >= startTime && now <= endTime) return 'active';
+    }
+    
+    return 'closed';
   };
 
   const handleCancelConfirm = () => {
@@ -74,8 +128,7 @@ const ReviewVotePage = () => {
       const votePromises = selectedCandidates.map((candidate) =>
         addDoc(collection(db, 'votes'), {
           candidateId: candidate.id,
-          positionId: candidate.positionId,
-          electionId: candidate.electionId,
+          position: candidate.position || candidate.positionName,
           timestamp: serverTimestamp(),
         })
       );
@@ -88,7 +141,7 @@ const ReviewVotePage = () => {
         candidates: selectedCandidates.map((c) => ({
           candidateId: c.id,
           candidateName: c.name,
-          positionName: c.positionName,
+          positionName: c.position || c.positionName,
         })),
         timestamp: serverTimestamp(),
       });
@@ -115,139 +168,116 @@ const ReviewVotePage = () => {
   const groupedCandidates = groupByPosition();
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 text-center">
-            Review Your Vote
-          </h1>
-          <p className="text-gray-600 text-center mt-2">
-            Please review your selections before submitting
-          </p>
-        </div>
+    <div className="review-page">
+      {/* Logo */}
+      <Logo />
 
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-800 font-semibold">{error}</p>
+      {/* Floating Countdown Timer */}
+      <FloatingCountdownTimer targetDate={getTargetDate()} votingStatus={getVotingStatus()} />
+
+      {/* Progress Bar */}
+      <div className="review-progress-container">
+        <div className="review-progress-bar">
+          <div className="progress-fill" style={{ width: '66.66%' }}></div>
+        </div>
+        <div className="review-progress-steps">
+          <div className="progress-step completed">
+            <span>SELECT</span>
           </div>
-        )}
-
-        {/* Selected Candidates by Position */}
-        <div className="space-y-6 mb-6">
-          {Object.entries(groupedCandidates).map(([positionName, candidates]) => (
-            <div key={positionName} className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold text-blue-600 mb-4">{positionName}</h2>
-              <div className="space-y-3">
-                {candidates.map((candidate) => (
-                  <div
-                    key={candidate.id}
-                    className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg"
-                  >
-                    {/* Candidate Photo */}
-                    {candidate.photoUrl ? (
-                      <img
-                        src={candidate.photoUrl}
-                        alt={candidate.name}
-                        className="w-16 h-16 rounded-full object-cover border-2 border-blue-200"
-                      />
-                    ) : (
-                      <div className="w-16 h-16 rounded-full bg-blue-200 flex items-center justify-center">
-                        <span className="text-blue-600 text-xl font-bold">
-                          {candidate.name?.charAt(0) || '?'}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Candidate Info */}
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-800">
-                        {candidate.name}
-                      </h3>
-                      {candidate.partylist && (
-                        <p className="text-sm text-blue-600 font-medium">
-                          {candidate.partylist}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Checkmark */}
-                    <div className="flex-shrink-0">
-                      <svg
-                        className="w-8 h-8 text-green-600"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-4">
-          <button
-            onClick={handleBackToVoting}
-            disabled={submitting}
-            className="flex-1 bg-gray-200 text-gray-800 py-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors disabled:opacity-50"
-          >
-            Back to Voting
-          </button>
-          <button
-            onClick={handleConfirmSubmit}
-            disabled={submitting}
-            className="flex-1 bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            Confirm and Submit Vote
-          </button>
-        </div>
-
-        {/* Confirmation Dialog */}
-        {showConfirmDialog && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">
-                Confirm Vote Submission
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Are you sure you want to submit your vote? This action cannot be undone.
-              </p>
-              <div className="flex gap-4">
-                <button
-                  onClick={handleCancelConfirm}
-                  disabled={submitting}
-                  className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmitVote}
-                  disabled={submitting}
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {submitting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      Submitting...
-                    </>
-                  ) : (
-                    'Yes, Submit'
-                  )}
-                </button>
-              </div>
-            </div>
+          <div className="progress-step active">
+            <span>REVIEW</span>
           </div>
-        )}
+          <div className="progress-step">
+            <span>CONFIRMATION</span>
+          </div>
+        </div>
       </div>
+
+      {/* Warning Banner */}
+      <div className="review-warning-banner">
+        <div className="warning-icon">⚠</div>
+        <div className="warning-text">
+          Please review your selections carefully. Once submitted, your vote cannot be changed.
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="review-error-message">
+          {error}
+        </div>
+      )}
+
+      {/* Your Selections */}
+      <div className="review-selections-section">
+        <h2 className="review-selections-title">Your Selections</h2>
+
+        {Object.entries(groupedCandidates).map(([positionName, candidates]) => (
+          <div key={positionName} className="review-selection-card">
+            <div className="review-selection-position-header">
+              <span className="review-selection-check-icon">✓</span>
+              <span className="review-selection-position-label">{positionName.toUpperCase()}</span>
+            </div>
+            {candidates.map((candidate) => (
+              <div key={candidate.id} className="review-selection-candidate-name">
+                {candidate.name.toUpperCase()}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Submit Button */}
+      <div className="review-actions-container">
+        <button
+          onClick={handleConfirmSubmit}
+          disabled={submitting}
+          className="review-btn-submit"
+        >
+          Confirm and Submit Vote
+        </button>
+      </div>
+
+      {/* Floating Bottom Navbar */}
+      <FloatingBottomNavbar />
+
+      {/* Confirmation Modal */}
+      {showConfirmDialog && (
+        <div className="review-confirm-modal-overlay" onClick={handleCancelConfirm}>
+          <div className="review-confirm-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="review-modal-close" onClick={handleCancelConfirm}>
+              ✕
+            </button>
+            <h3 className="review-confirm-modal-title">Confirm Vote Submission</h3>
+            <p className="review-confirm-modal-text">
+              Are you sure you want to submit your vote? This action cannot be undone.
+            </p>
+            <div className="review-confirm-modal-actions">
+              <button
+                onClick={handleCancelConfirm}
+                disabled={submitting}
+                className="review-btn-cancel"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitVote}
+                disabled={submitting}
+                className="review-btn-confirm"
+              >
+                {submitting ? (
+                  <>
+                    <div className="review-spinner"></div>
+                    Submitting...
+                  </>
+                ) : (
+                  'Yes, Submit'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

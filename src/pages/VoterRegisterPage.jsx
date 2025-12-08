@@ -171,7 +171,9 @@ const VoterRegisterPage = () => {
               onChange={handleChange}
               disabled={loading}
               className="form-input"
+              max="2007-12-31"
             />
+            <p className="field-hint">You must be at least 18 years old to register</p>
           </div>
 
           {/* Student ID */}
@@ -196,6 +198,7 @@ const VoterRegisterPage = () => {
               onChange={handleChange}
               disabled={loading}
               className="form-input"
+              style={{ color: formData.yearLevel ? '#333' : '#999' }}
             >
               <option value="">Select Year Level</option>
               <option value="1st Year">1st Year</option>
@@ -213,11 +216,12 @@ const VoterRegisterPage = () => {
               onChange={handleChange}
               disabled={loading}
               className="form-input"
+              style={{ color: formData.school ? '#333' : '#999' }}
             >
               <option value="">Select School</option>
               <option value="SOB">School of Business (SOB)</option>
               <option value="SOTE">School of Teacher Education (SOTE)</option>
-              <option value="SAST">School of Arts, Sciences and Technology (SAST)</option>
+              <option value="SOAST">School of Arts, Sciences and Technology (SOAST)</option>
               <option value="SOCJ">School of Criminal Justice (SOCJ)</option>
             </select>
           </div>

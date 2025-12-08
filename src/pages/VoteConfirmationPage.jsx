@@ -1,62 +1,119 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import Logo from '../components/Logo';
+import FloatingBottomNavbar from '../components/FloatingBottomNavbar';
+import FloatingCountdownTimer from '../components/FloatingCountdownTimer';
+import './VoteConfirmationPage.css';
 
 const VoteConfirmationPage = () => {
   const navigate = useNavigate();
+  const [election, setElection] = useState(null);
 
-  const handleDone = () => {
-    navigate('/voter/home');
+  useEffect(() => {
+    // Set up real-time listener for active election
+    const electionsRef = collection(db, 'elections');
+    const activeElectionQuery = query(electionsRef, where('status', '==', 'active'));
+
+    const unsubscribeElection = onSnapshot(activeElectionQuery, (electionSnapshot) => {
+      if (!electionSnapshot.empty) {
+        const electionData = {
+          id: electionSnapshot.docs[0].id,
+          ...electionSnapshot.docs[0].data(),
+        };
+        setElection(electionData);
+      } else {
+        setElection(null);
+      }
+    });
+
+    return () => {
+      unsubscribeElection();
+    };
+  }, []);
+
+  const getTargetDate = () => {
+    if (!election) return null;
+    
+    const now = new Date();
+    const startTime = election.startTime?.toDate();
+    const endTime = election.endTime?.toDate();
+
+    if (startTime && now < startTime) {
+      return startTime;
+    } else if (endTime && now < endTime) {
+      return endTime;
+    }
+    
+    return null;
+  };
+
+  const getVotingStatus = () => {
+    if (!election) return 'closed';
+    
+    const now = new Date();
+    const startTime = election.startTime?.toDate();
+    const endTime = election.endTime?.toDate();
+
+    if (startTime && endTime) {
+      if (now < startTime) return 'upcoming';
+      if (now >= startTime && now <= endTime) return 'active';
+    }
+    
+    return 'closed';
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        {/* Success Card */}
-        <div className="bg-white rounded-lg shadow-xl p-8 text-center">
-          {/* Success Icon */}
-          <div className="mb-6">
-            <div className="mx-auto w-24 h-24 bg-green-100 rounded-full flex items-center justify-center">
-              <svg
-                className="w-16 h-16 text-green-600"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
+    <div className="confirmation-page">
+      {/* Logo */}
+      <Logo />
+
+      {/* Floating Countdown Timer */}
+      <FloatingCountdownTimer targetDate={getTargetDate()} votingStatus={getVotingStatus()} />
+
+      {/* Progress Bar */}
+      <div className="confirmation-progress-container">
+        <div className="confirmation-progress-bar">
+          <div className="progress-fill" style={{ width: '100%' }}></div>
+        </div>
+        <div className="confirmation-progress-steps">
+          <div className="progress-step completed">
+            <span>SELECT</span>
           </div>
-
-          {/* Success Message */}
-          <h1 className="text-3xl font-bold text-gray-800 mb-4">
-            VOTE SUBMITTED SUCCESSFULLY!
-          </h1>
-
-          <p className="text-gray-600 mb-2">
-            Thank you for participating in the election.
-          </p>
-          <p className="text-gray-600 mb-8">
-            Your vote has been recorded securely and anonymously.
-          </p>
-
-          {/* Info Box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
-            <p className="text-sm text-blue-800">
-              You can view your vote receipt from your profile page at any time.
-            </p>
+          <div className="progress-step completed">
+            <span>REVIEW</span>
           </div>
-
-          {/* Done Button */}
-          <button
-            onClick={handleDone}
-            className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-colors"
-          >
-            Done
-          </button>
+          <div className="progress-step active">
+            <span>CONFIRMATION</span>
+          </div>
         </div>
       </div>
+
+      {/* Success Content */}
+      <div className="confirmation-success-content">
+        {/* Ballot Box Icon */}
+        <div className="confirmation-ballot-icon">
+          <svg width="200" height="200" viewBox="0 0 200 200" fill="none">
+            {/* Ballot Box */}
+            <rect x="50" y="100" width="100" height="60" fill="#FFA500" stroke="#0052cc" strokeWidth="4" rx="4"/>
+            <rect x="50" y="90" width="100" height="15" fill="#FFB84D" stroke="#0052cc" strokeWidth="4"/>
+            {/* Ballot Paper */}
+            <rect x="70" y="50" width="60" height="50" fill="white" stroke="#0052cc" strokeWidth="4" rx="4"/>
+            {/* Check Mark */}
+            <path d="M85 70 L95 80 L115 60" stroke="#00A8E8" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+          </svg>
+        </div>
+
+        {/* Success Message */}
+        <h1 className="confirmation-success-title">VOTE SUBMITTED SUCCESSFULLY!</h1>
+        <p className="confirmation-success-message">
+          Thank you for participating in the election
+        </p>
+      </div>
+
+      {/* Floating Bottom Navbar */}
+      <FloatingBottomNavbar />
     </div>
   );
 };

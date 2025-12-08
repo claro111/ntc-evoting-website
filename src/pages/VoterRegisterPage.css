@@ -72,13 +72,18 @@
 
 /* Date input styling */
 .form-input[type="date"] {
-  color: #333;
+  color: #999;
   cursor: pointer;
 }
 
 .form-input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
   color: #0052cc;
+}
+
+/* When date is selected, make it darker */
+.form-input[type="date"]:not(:placeholder-shown) {
+  color: #333;
 }
 
 /* Select dropdown styling */
@@ -90,6 +95,13 @@ select.form-input {
   background-repeat: no-repeat;
   background-position: right 15px center;
   padding-right: 40px;
+  color: #333;
+}
+
+/* Placeholder color for select elements */
+.form-input select option[value=""],
+select.form-input option[value=""] {
+  color: #999;
 }
 
 .form-input select:focus,
@@ -156,6 +168,16 @@ select.form-input option {
   font-size: 11px;
   color: #999;
   margin-top: 4px;
+  margin-bottom: -8px;
+  margin-left: 2px;
+}
+
+.field-hint {
+  display: block;
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+  margin-bottom: -8px;
   margin-left: 2px;
 }
 

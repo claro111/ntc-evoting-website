@@ -20,6 +20,8 @@ import ManageVotersPage from './pages/ManageVotersPage';
 import ManageCandidatesPage from './pages/ManageCandidatesPage';
 import VotingControlPage from './pages/VotingControlPage';
 import ManageAnnouncementsPage from './pages/ManageAnnouncementsPage';
+import ProtectedAdminRoute from './components/ProtectedAdminRoute';
+import ProtectedVoterRoute from './components/ProtectedVoterRoute';
 
 function App() {
   return (
@@ -34,7 +36,7 @@ function App() {
           <Route path="/verify-email" element={<EmailVerificationPage />} />
           
           {/* Voter App Routes with Layout */}
-          <Route path="/voter" element={<VoterLayout />}>
+          <Route path="/voter" element={<ProtectedVoterRoute><VoterLayout /></ProtectedVoterRoute>}>
             <Route path="home" element={<VoterHomepage />} />
             <Route path="announcements" element={<AnnouncementPage />} />
             <Route path="voting" element={<VotingPage />} />
@@ -42,16 +44,16 @@ function App() {
           </Route>
           
           {/* Vote Review and Confirmation (outside layout for full-screen experience) */}
-          <Route path="/voter/review-vote" element={<ReviewVotePage />} />
-          <Route path="/voter/vote-confirmation" element={<VoteConfirmationPage />} />
-          <Route path="/voter/vote-receipt" element={<VoteReceiptPage />} />
+          <Route path="/voter/review-vote" element={<ProtectedVoterRoute><ReviewVotePage /></ProtectedVoterRoute>} />
+          <Route path="/voter/vote-confirmation" element={<ProtectedVoterRoute><VoteConfirmationPage /></ProtectedVoterRoute>} />
+          <Route path="/voter/vote-receipt" element={<ProtectedVoterRoute><VoteReceiptPage /></ProtectedVoterRoute>} />
           
           {/* Admin Routes */}
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/admin/forgot-password" element={<AdminForgotPasswordPage />} />
           
           {/* Admin App Routes with Layout */}
-          <Route path="/admin" element={<AdminLayout />}>
+          <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="manage-voters" element={<ManageVotersPage />} />
             <Route path="manage-candidates" element={<ManageCandidatesPage />} />

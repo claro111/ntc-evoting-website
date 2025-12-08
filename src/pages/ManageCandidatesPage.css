@@ -116,7 +116,7 @@
 }
 
 .btn-edit {
-  background: #3b82f6;
+  background: #48bb78;
   color: white;
   border: none;
   padding: 8px 16px;
@@ -124,10 +124,11 @@
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s;
+  flex: 1;
 }
 
 .btn-edit:hover {
-  background: #2563eb;
+  background: #38a169;
 }
 
 .btn-delete {
@@ -139,6 +140,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s;
+  flex: 1;
 }
 
 .btn-delete:hover {
@@ -203,6 +205,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  text-align: center;
 }
 
 .candidate-photo {
@@ -234,23 +237,53 @@
   margin-bottom: 5px;
 }
 
-.candidate-partylist {
-  font-size: 14px;
-  color: #6b7280;
-  font-style: italic;
-  margin-bottom: 5px;
-}
-
-.candidate-description {
-  font-size: 14px;
+.candidate-bio {
+  font-size: 13px;
   color: #4b5563;
   line-height: 1.5;
+  margin-bottom: 8px;
+  max-height: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.candidate-platform {
+  display: none;
+}
+
+.candidate-bio p,
+.candidate-platform p {
+  margin: 0 0 8px 0;
+}
+
+.candidate-bio ul,
+.candidate-bio ol,
+.candidate-platform ul,
+.candidate-platform ol {
+  margin: 0 0 8px 0;
+  padding-left: 20px;
+}
+
+.candidate-bio strong,
+.candidate-platform strong {
+  font-weight: 600;
+}
+
+.candidate-bio em,
+.candidate-platform em {
+  font-style: italic;
 }
 
 .candidate-actions {
   display: flex;
+  flex-direction: row;
   gap: 10px;
   margin-top: auto;
+  justify-content: center;
 }
 
 /* Modal Styles */
@@ -287,6 +320,7 @@
   align-items: center;
   padding: 20px;
   border-bottom: 1px solid #e5e7eb;
+  background: white;
 }
 
 .modal-title {
@@ -364,6 +398,35 @@
   font-size: 12px;
   color: #6b7280;
   margin-top: 5px;
+}
+
+/* React Quill Editor Styles */
+.form-group .quill {
+  background: white;
+  border-radius: 8px;
+}
+
+.form-group .ql-toolbar {
+  border: 1px solid #d1d5db;
+  border-radius: 8px 8px 0 0;
+  background: #f9fafb;
+}
+
+.form-group .ql-container {
+  border: 1px solid #d1d5db;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  font-size: 14px;
+  min-height: 150px;
+}
+
+.form-group .ql-editor {
+  min-height: 150px;
+}
+
+.form-group .ql-editor.ql-blank::before {
+  color: #9ca3af;
+  font-style: normal;
 }
 
 .modal-footer {

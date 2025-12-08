@@ -237,6 +237,37 @@ const VotingControlPage = () => {
     }
   };
 
+  const handlePublishResults = async () => {
+    if (electionStatus?.status === 'active') {
+      alert('Cannot publish results while voting is active. Please close the voting session first.');
+      return;
+    }
+
+    const confirmPublish = window.confirm(
+      'Are you sure you want to publish the results? This will make the vote counts visible to all voters.'
+    );
+
+    if (!confirmPublish) return;
+
+    try {
+      setProcessing(true);
+
+      const electionRef = doc(db, 'elections', 'current');
+      await updateDoc(electionRef, {
+        resultsPublished: true,
+        publishedAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+
+      alert('Results published successfully! Voters can now see the election results.');
+      setProcessing(false);
+    } catch (err) {
+      console.error('Error publishing results:', err);
+      alert('Failed to publish results. Please try again.');
+      setProcessing(false);
+    }
+  };
+
   const handleResetSystem = async () => {
     if (!resetConfirmed) {
       alert('Please confirm that you understand this action will permanently reset all voting data');
@@ -306,6 +337,8 @@ const VotingControlPage = () => {
         endTime: null,
         duration: null,
         closedAt: null,
+        resultsPublished: false,
+        publishedAt: null,
         updatedAt: Timestamp.now(),
       });
 
@@ -437,6 +470,39 @@ const VotingControlPage = () => {
             >
               {processing ? 'Closing...' : 'Close Voting Session'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Publish Results Panel */}
+      {!isActive && electionStatus?.status === 'closed' && (
+        <div className="control-panel">
+          <h2 className="section-title">Publish Results</h2>
+          <div className="panel-content">
+            <p className="panel-description">
+              Publishing results will make the vote counts and winners visible to all voters on the homepage and voting page.
+            </p>
+
+            {electionStatus?.resultsPublished ? (
+              <div className="published-status">
+                <svg width="24" height="24" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span>Results have been published</span>
+              </div>
+            ) : (
+              <button
+                className="btn-publish"
+                onClick={handlePublishResults}
+                disabled={processing}
+              >
+                {processing ? 'Publishing...' : 'Publish Results'}
+              </button>
+            )}
           </div>
         </div>
       )}

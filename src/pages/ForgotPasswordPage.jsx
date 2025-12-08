@@ -52,14 +52,9 @@ const ForgotPasswordPage = () => {
   return (
     <div className="forgot-password-container">
       <div className="forgot-password-card">
-        {/* Logo */}
+        {/* Logo - Inside card, centered above title */}
         <div className="logo-container">
-          <div className="logo-circle">
-            <svg className="logo-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 18c-3.86-.96-7-5.54-7-10V8.3l7-3.11 7 3.11V10c0 4.46-3.14 9.04-7 10z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-          </div>
+          <img src="/ntc-logo.png" alt="NTC Logo" className="ntc-logo" />
         </div>
 
         {/* Title */}

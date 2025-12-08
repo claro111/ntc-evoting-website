@@ -1,3 +1,5 @@
+import './CandidateCard.css';
+
 const CandidateCard = ({ candidate, showVoteButton = false, onVote, isSelected = false }) => {
   if (!candidate) return null;
 
@@ -36,9 +38,6 @@ const CandidateCard = ({ candidate, showVoteButton = false, onVote, isSelected =
             {candidate.positionName && (
               <p className="text-sm text-gray-600">{candidate.positionName}</p>
             )}
-            {candidate.partylist && (
-              <p className="text-sm text-blue-600 font-medium mt-1">{candidate.partylist}</p>
-            )}
           </div>
 
           {/* Vote Button or Selected Indicator */}
@@ -63,10 +62,13 @@ const CandidateCard = ({ candidate, showVoteButton = false, onVote, isSelected =
           )}
         </div>
 
-        {/* Candidate Description (if available) */}
-        {candidate.description && (
+        {/* Candidate Bio (if available) */}
+        {candidate.bio && (
           <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-sm text-gray-600 line-clamp-3">{candidate.description}</p>
+            <div 
+              className="text-sm text-gray-600 line-clamp-3 candidate-bio-preview"
+              dangerouslySetInnerHTML={{ __html: candidate.bio }}
+            />
           </div>
         )}
       </div>

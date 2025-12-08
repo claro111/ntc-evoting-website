@@ -286,10 +286,15 @@
 
 .position-section {
   margin-bottom: 20px;
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
 }
 
 .position-header {
+  background: white !important;
   border-bottom: 3px solid #fbbf24;
+  padding: 0;
   padding-bottom: 8px;
   margin-bottom: 15px;
 }
@@ -319,6 +324,11 @@
   padding: 12px;
   background: #f9fafb;
   border-radius: 8px;
+}
+
+.candidate-item.first-place {
+  background: #fef3c7;
+  border: 2px solid #fbbf24;
 }
 
 .candidate-rank {
@@ -407,4 +417,26 @@
 .loading-text {
   color: #6b7280;
   font-size: 16px;
+}
+
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #9ca3af;
+  background: white;
+  border-radius: 12px;
+}
+
+.empty-state p {
+  font-size: 16px;
+  margin: 0;
+}
+
+.no-candidates {
+  text-align: center;
+  padding: 30px;
+  color: #9ca3af;
+  font-size: 14px;
 }

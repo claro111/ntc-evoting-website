@@ -44,7 +44,7 @@ const VoterLoginPage = () => {
     }
 
     try {
-      const { user, voterData } = await loginVoter(formData.email, formData.password);
+      const { voterData } = await loginVoter(formData.email, formData.password);
 
       if (voterData.status === 'pending') {
         setStatusMessage('Your account is pending admin approval. Please wait for approval.');
@@ -93,14 +93,9 @@ const VoterLoginPage = () => {
   return (
     <div className="login-container">
       <div className="login-card">
-        {/* Logo */}
+        {/* Logo - Inside card, centered above title */}
         <div className="logo-container">
-          <div className="logo-circle">
-            <svg className="logo-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 18c-3.86-.96-7-5.54-7-10V8.3l7-3.11 7 3.11V10c0 4.46-3.14 9.04-7 10z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-          </div>
+          <img src="/ntc-logo.png" alt="NTC Logo" className="ntc-logo" />
         </div>
 
         {/* Title */}
@@ -112,9 +107,6 @@ const VoterLoginPage = () => {
           {/* Email Field */}
           <div className="form-group">
             <div className="input-wrapper">
-              <svg className="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
               <input
                 type="email"
                 name="email"
@@ -130,9 +122,6 @@ const VoterLoginPage = () => {
           {/* Password Field */}
           <div className="form-group">
             <div className="input-wrapper">
-              <svg className="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
               <input
                 type={showPassword ? 'text' : 'password'}
                 name="password"

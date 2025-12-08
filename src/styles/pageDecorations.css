@@ -1,0 +1,163 @@
+/* Reusable Page Decorations - Dots, Squares, and Lines on Sides */
+/* Add class "page-with-decorations" to any page container to apply these styles */
+
+.page-with-decorations {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Left Side Decorations - Dots */
+.page-with-decorations::before {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background-color: #FCD34D;
+  border-radius: 50%;
+  top: 80px;
+  left: 20px;
+  pointer-events: none;
+  z-index: 0;
+  box-shadow: 
+    0 150px 0 0 #FCD34D,
+    0 300px 0 0 #FCD34D,
+    0 450px 0 0 #FCD34D,
+    0 600px 0 0 #FCD34D,
+    5px 75px 0 0 #60A5FA,
+    5px 225px 0 0 #60A5FA,
+    5px 375px 0 0 #60A5FA,
+    5px 525px 0 0 #60A5FA;
+}
+
+/* Right Side Decorations - Dots */
+.page-with-decorations::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background-color: #FCD34D;
+  border-radius: 50%;
+  top: 100px;
+  right: 20px;
+  pointer-events: none;
+  z-index: 0;
+  box-shadow: 
+    0 150px 0 0 #FCD34D,
+    0 300px 0 0 #FCD34D,
+    0 450px 0 0 #FCD34D,
+    0 600px 0 0 #FCD34D,
+    -5px 75px 0 0 #60A5FA,
+    -5px 225px 0 0 #60A5FA,
+    -5px 375px 0 0 #60A5FA,
+    -5px 525px 0 0 #60A5FA;
+}
+
+/* Decorative Lines - Left Side */
+.page-with-decorations .decoration-lines-left {
+  position: absolute;
+  left: 15px;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page-with-decorations .decoration-lines-left::before {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 60px;
+  background: linear-gradient(to bottom, transparent, #E5E7EB, transparent);
+  top: 200px;
+  left: 0;
+}
+
+.page-with-decorations .decoration-lines-left::after {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 80px;
+  background: linear-gradient(to bottom, transparent, #E5E7EB, transparent);
+  top: 400px;
+  left: 0;
+}
+
+/* Decorative Lines - Right Side */
+.page-with-decorations .decoration-lines-right {
+  position: absolute;
+  right: 15px;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page-with-decorations .decoration-lines-right::before {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 60px;
+  background: linear-gradient(to bottom, transparent, #E5E7EB, transparent);
+  top: 250px;
+  right: 0;
+}
+
+.page-with-decorations .decoration-lines-right::after {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 80px;
+  background: linear-gradient(to bottom, transparent, #E5E7EB, transparent);
+  top: 450px;
+  right: 0;
+}
+
+/* Square Decorations - Left Side */
+.page-with-decorations .decoration-square-left {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #FCD34D;
+  top: 180px;
+  left: 45px;
+  pointer-events: none;
+  z-index: 0;
+  box-shadow: 
+    0 280px 0 0 #FCD34D,
+    0 560px 0 0 #FCD34D;
+}
+
+/* Square Decorations - Right Side */
+.page-with-decorations .decoration-square-right {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #FCD34D;
+  top: 220px;
+  right: 45px;
+  pointer-events: none;
+  z-index: 0;
+  box-shadow: 
+    0 280px 0 0 #FCD34D,
+    0 560px 0 0 #FCD34D;
+}
+
+/* Ensure content stays above decorations */
+.page-with-decorations > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Responsive - Hide on smaller screens */
+@media (max-width: 1024px) {
+  .page-with-decorations::before,
+  .page-with-decorations::after,
+  .page-with-decorations .decoration-lines-left,
+  .page-with-decorations .decoration-lines-right,
+  .page-with-decorations .decoration-square-left,
+  .page-with-decorations .decoration-square-right {
+    display: none;
+  }
+}

@@ -16,7 +16,7 @@ Stores voter registration and account information.
   birthdate: Timestamp,
   studentId: "8212753",
   yearLevel: "3rd Year", // "1st Year" | "2nd Year" | "3rd Year" | "4th Year"
-  school: "SOCJ", // "SOB" | "SOTE" | "SAST" | "SOCJ"
+  school: "SOCJ", // "SOB" | "SOTE" | "SOAST" | "SOCJ"
   email: "john.doe@ntc.edu.ph",
   verificationDocument: "gs://bucket/verification_docs/voter-id/document.pdf",
   emailVerified: false,

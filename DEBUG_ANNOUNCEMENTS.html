@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug Announcements</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      border-bottom: 3px solid #4CAF50;
+      padding-bottom: 10px;
+    }
+    .section {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f9f9f9;
+      border-left: 4px solid #2196F3;
+    }
+    .success {
+      color: #4CAF50;
+      font-weight: bold;
+    }
+    .error {
+      color: #f44336;
+      font-weight: bold;
+    }
+    .warning {
+      color: #ff9800;
+      font-weight: bold;
+    }
+    button {
+      background: #2196F3;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #1976D2;
+    }
+    pre {
+      background: #263238;
+      color: #aed581;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .announcement-item {
+      background: white;
+      padding: 15px;
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .announcement-item h3 {
+      margin: 0 0 10px 0;
+      color: #2196F3;
+    }
+    .field {
+      margin: 5px 0;
+      padding: 5px;
+      background: #f5f5f5;
+    }
+    .field strong {
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Announcement Sync Debugger</h1>
+    <p>This tool helps diagnose why announcements aren't showing on the voter page.</p>
+
+    <button onclick="runDiagnostics()">Run Diagnostics</button>
+    <button onclick="location.reload()">Refresh Page</button>
+
+    <div id="results"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+    import { getFirestore, collection, getDocs, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+    import { getAuth } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDUYfPh-LviOFw_vhIn3HI5oSbILbxUvKg",
+      authDomain: "ntc-evoting-website.firebaseapp.com",
+      projectId: "ntc-evoting-website",
+      storageBucket: "ntc-evoting-website.firebasestorage.app",
+      messagingSenderId: "71858654246",
+      appId: "1:71858654246:web:e1e0e1e1e1e1e1e1e1e1e1"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    window.runDiagnostics = async function() {
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '<p>Running diagnostics...</p>';
+
+      let html = '';
+
+      try {
+        // Check 1: Get ALL announcements
+        html += '<div class="section">';
+        html += '<h2>📋 Step 1: All Announcements in Database</h2>';
+        
+        const allAnnouncementsRef = collection(db, 'announcements');
+        const allAnnouncementsQuery = query(allAnnouncementsRef, orderBy('createdAt', 'desc'));
+        const allSnapshot = await getDocs(allAnnouncementsQuery);
+        
+        html += `<p>Total announcements found: <strong>${allSnapshot.size}</strong></p>`;
+        
+        if (allSnapshot.empty) {
+          html += '<p class="error">❌ No announcements found in database!</p>';
+          html += '<p>Solution: Go to admin panel and create an announcement.</p>';
+        } else {
+          html += '<p class="success">✅ Announcements exist in database</p>';
+          
+          allSnapshot.forEach((doc) => {
+            const data = doc.data();
+            html += '<div class="announcement-item">';
+            html += `<h3>${data.title || 'No Title'}</h3>`;
+            html += `<div class="field"><strong>ID:</strong> ${doc.id}</div>`;
+            html += `<div class="field"><strong>isActive:</strong> ${data.isActive !== undefined ? data.isActive : 'NOT SET'}</div>`;
+            html += `<div class="field"><strong>Created:</strong> ${data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString() : 'N/A'}</div>`;
+            html += `<div class="field"><strong>Description:</strong> ${data.description ? data.description.substring(0, 100) + '...' : 'No description'}</div>`;
+            html += '</div>';
+          });
+        }
+        html += '</div>';
+
+        // Check 2: Get ACTIVE announcements (what voter page sees)
+        html += '<div class="section">';
+        html += '<h2>👁️ Step 2: Active Announcements (Voter Page Filter)</h2>';
+        
+        const activeAnnouncementsRef = collection(db, 'announcements');
+        const activeAnnouncementsQuery = query(
+          activeAnnouncementsRef,
+          where('isActive', '==', true),
+          orderBy('createdAt', 'desc')
+        );
+        
+        try {
+          const activeSnapshot = await getDocs(activeAnnouncementsQuery);
+          
+          html += `<p>Active announcements found: <strong>${activeSnapshot.size}</strong></p>`;
+          
+          if (activeSnapshot.empty) {
+            html += '<p class="error">❌ No active announcements found!</p>';
+            html += '<p class="warning">This is why the voter page shows "No current announcements"</p>';
+            html += '<p><strong>Possible causes:</strong></p>';
+            html += '<ul>';
+            html += '<li>Announcements don\'t have <code>isActive: true</code> field</li>';
+            html += '<li>All announcements are inactive</li>';
+            html += '<li>Firestore index not created for this query</li>';
+            html += '</ul>';
+          } else {
+            html += '<p class="success">✅ Active announcements found - these should show on voter page</p>';
+            
+            activeSnapshot.forEach((doc) => {
+              const data = doc.data();
+              html += '<div class="announcement-item">';
+              html += `<h3>${data.title || 'No Title'}</h3>`;
+              html += `<div class="field"><strong>ID:</strong> ${doc.id}</div>`;
+              html += `<div class="field"><strong>Created:</strong> ${data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString() : 'N/A'}</div>`;
+              html += '</div>';
+            });
+          }
+        } catch (error) {
+          html += `<p class="error">❌ Error querying active announcements: ${error.message}</p>`;
+          if (error.code === 'failed-precondition') {
+            html += '<p class="warning">⚠️ Firestore index missing!</p>';
+            html += '<p>Click the link in the browser console to create the index.</p>';
+          }
+        }
+        html += '</div>';
+
+        // Check 3: Authentication
+        html += '<div class="section">';
+        html += '<h2>🔐 Step 3: Authentication Status</h2>';
+        if (auth.currentUser) {
+          html += `<p class="success">✅ Logged in as: ${auth.currentUser.email}</p>`;
+        } else {
+          html += '<p class="warning">⚠️ Not logged in (this is OK for viewing announcements)</p>';
+        }
+        html += '</div>';
+
+        // Check 4: Summary and Solutions
+        html += '<div class="section">';
+        html += '<h2>💡 Summary & Solutions</h2>';
+        
+        if (allSnapshot.empty) {
+          html += '<p class="error"><strong>Problem:</strong> No announcements in database</p>';
+          html += '<p><strong>Solution:</strong> Create announcements in the admin panel</p>';
+        } else {
+          const hasActiveField = allSnapshot.docs.some(doc => doc.data().isActive !== undefined);
+          
+          if (!hasActiveField) {
+            html += '<p class="error"><strong>Problem:</strong> Announcements missing <code>isActive</code> field</p>';
+            html += '<p><strong>Solution:</strong> The admin page should set <code>isActive: true</code> when creating announcements</p>';
+            html += '<p>Check that ManageAnnouncementsPage.jsx includes <code>isActive: true</code> in the addDoc call</p>';
+          } else {
+            const activeCount = allSnapshot.docs.filter(doc => doc.data().isActive === true).length;
+            if (activeCount === 0) {
+              html += '<p class="warning"><strong>Problem:</strong> All announcements have <code>isActive: false</code></p>';
+              html += '<p><strong>Solution:</strong> Set announcements to active in the admin panel</p>';
+            } else {
+              html += '<p class="success"><strong>Everything looks good!</strong></p>';
+              html += '<p>Announcements should be visible on the voter page.</p>';
+              html += '<p>If they\'re still not showing, try:</p>';
+              html += '<ul>';
+              html += '<li>Hard refresh the voter page (Ctrl+Shift+R or Cmd+Shift+R)</li>';
+              html += '<li>Clear browser cache</li>';
+              html += '<li>Check browser console for errors</li>';
+              html += '</ul>';
+            }
+          }
+        }
+        html += '</div>';
+
+      } catch (error) {
+        html += `<div class="section"><p class="error">Error: ${error.message}</p><pre>${error.stack}</pre></div>`;
+      }
+
+      resultsDiv.innerHTML = html;
+    };
+  </script>
+</body>
+</html>

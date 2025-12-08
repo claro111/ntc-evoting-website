@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, getCountFromServer } from 'firebase/firestore';
+import { collection, query, where, getDocs, getCountFromServer, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -12,35 +13,119 @@ const AdminDashboard = () => {
   });
   const [votingStatus, setVotingStatus] = useState('CLOSED');
   const [loading, setLoading] = useState(true);
+  const [positions, setPositions] = useState([]);
+  const [candidates, setCandidates] = useState([]);
+  const [votes, setVotes] = useState([]);
+  const [yearLevelData, setYearLevelData] = useState([]);
+  const [schoolData, setSchoolData] = useState([]);
 
   useEffect(() => {
+    console.log('AdminDashboard: Setting up real-time listeners');
+    
+    // Real-time listeners for positions, candidates, and votes
+    const unsubscribePositions = onSnapshot(
+      collection(db, 'positions'),
+      (snapshot) => {
+        console.log('Positions updated:', snapshot.size);
+        const positionsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setPositions(positionsData.sort((a, b) => (a.order || 0) - (b.order || 0)));
+      },
+      (error) => {
+        console.error('Error in positions listener:', error);
+      }
+    );
+
+    const unsubscribeCandidates = onSnapshot(
+      collection(db, 'candidates'),
+      (snapshot) => {
+        console.log('Candidates updated:', snapshot.size);
+        const candidatesData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setCandidates(candidatesData);
+      },
+      (error) => {
+        console.error('Error in candidates listener:', error);
+      }
+    );
+
+    const unsubscribeVotes = onSnapshot(
+      collection(db, 'votes'),
+      (snapshot) => {
+        console.log('Votes updated:', snapshot.size);
+        const votesData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setVotes(votesData);
+      },
+      (error) => {
+        console.error('Error in votes listener:', error);
+      }
+    );
+
+    // Real-time listener for voters to update statistics and demographics
+    const unsubscribeVoters = onSnapshot(
+      collection(db, 'voters'),
+      (snapshot) => {
+        console.log('Voters updated:', snapshot.size);
+        fetchDashboardData();
+        fetchDemographicsData();
+      },
+      (error) => {
+        console.error('Error in voters listener:', error);
+      }
+    );
+
+    // Real-time listener for elections to update voting status
+    const electionsRef = collection(db, 'elections');
+    const unsubscribeElection = onSnapshot(
+      electionsRef,
+      (electionSnapshot) => {
+        console.log('Elections updated:', electionSnapshot.size);
+        const activeElection = electionSnapshot.docs.find(doc => doc.data().status === 'active');
+        
+        if (activeElection) {
+          const electionData = activeElection.data();
+          const now = new Date();
+          const startTime = electionData.startTime?.toDate();
+          const endTime = electionData.endTime?.toDate();
+
+          if (startTime && endTime && now >= startTime && now <= endTime) {
+            setVotingStatus('OPEN');
+          } else {
+            setVotingStatus('CLOSED');
+          }
+        } else {
+          setVotingStatus('CLOSED');
+        }
+      },
+      (error) => {
+        console.error('Error in elections listener:', error);
+      }
+    );
+
+    // Initial fetch
     fetchDashboardData();
+    fetchDemographicsData();
+
+    return () => {
+      console.log('AdminDashboard: Cleaning up listeners');
+      unsubscribePositions();
+      unsubscribeCandidates();
+      unsubscribeVotes();
+      unsubscribeVoters();
+      unsubscribeElection();
+    };
   }, []);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-
-      // Check voting status
-      const electionsRef = collection(db, 'elections');
-      const activeElectionQuery = query(
-        electionsRef,
-        where('status', '==', 'active')
-      );
-      const electionSnapshot = await getDocs(activeElectionQuery);
-
-      if (!electionSnapshot.empty) {
-        const electionData = electionSnapshot.docs[0].data();
-        const now = new Date();
-        const startTime = electionData.startTime?.toDate();
-        const endTime = electionData.endTime?.toDate();
-
-        if (startTime && endTime && now >= startTime && now <= endTime) {
-          setVotingStatus('OPEN');
-        } else {
-          setVotingStatus('CLOSED');
-        }
-      }
 
       // Fetch voter statistics
       const votersRef = collection(db, 'voters');
@@ -83,9 +168,107 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchDemographicsData = async () => {
+    try {
+      // Fetch all registered voters
+      const votersRef = collection(db, 'voters');
+      const registeredQuery = query(
+        votersRef,
+        where('status', '==', 'registered'),
+        where('emailVerified', '==', true)
+      );
+      const votersSnapshot = await getDocs(registeredQuery);
+      const voters = votersSnapshot.docs.map((doc) => doc.data());
+
+      // Define all possible year levels
+      const allYearLevels = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+      
+      // Initialize year level stats with all possible values
+      const yearLevelStats = {};
+      allYearLevels.forEach((yearLevel) => {
+        yearLevelStats[yearLevel] = { total: 0, voted: 0 };
+      });
+
+      // Process Year Level data
+      voters.forEach((voter) => {
+        const yearLevel = voter.yearLevel || 'Unknown';
+        if (!yearLevelStats[yearLevel]) {
+          yearLevelStats[yearLevel] = { total: 0, voted: 0 };
+        }
+        yearLevelStats[yearLevel].total += 1;
+        if (voter.hasVoted) {
+          yearLevelStats[yearLevel].voted += 1;
+        }
+      });
+
+      const yearLevelChartData = allYearLevels.map((yearLevel) => ({
+        name: yearLevel,
+        'Voted': yearLevelStats[yearLevel].voted,
+        'Not Voted': yearLevelStats[yearLevel].total - yearLevelStats[yearLevel].voted,
+      }));
+
+      setYearLevelData(yearLevelChartData);
+
+      // Define all possible schools
+      const allSchools = ['SOB', 'SOTE', 'SOAST', 'SOCJ'];
+      
+      // Initialize school stats with all possible values
+      const schoolStats = {};
+      allSchools.forEach((school) => {
+        schoolStats[school] = { total: 0, voted: 0 };
+      });
+
+      // Process School data
+      voters.forEach((voter) => {
+        const school = voter.school || 'Unknown';
+        if (!schoolStats[school]) {
+          schoolStats[school] = { total: 0, voted: 0 };
+        }
+        schoolStats[school].total += 1;
+        if (voter.hasVoted) {
+          schoolStats[school].voted += 1;
+        }
+      });
+
+      const schoolChartData = allSchools.map((school) => ({
+        name: school,
+        'Voted': schoolStats[school].voted,
+        'Not Voted': schoolStats[school].total - schoolStats[school].voted,
+      }));
+
+      setSchoolData(schoolChartData);
+    } catch (err) {
+      console.error('Error fetching demographics data:', err);
+    }
+  };
+
   const handleExportReports = () => {
     // TODO: Implement export functionality
     alert('Export functionality will be implemented in a future update');
+  };
+
+  // Calculate vote counts for each candidate
+  const getCandidateVotes = (candidateId) => {
+    return votes.filter((vote) => vote.candidateId === candidateId).length;
+  };
+
+  // Get candidates for a specific position with vote counts
+  const getCandidatesForPosition = (positionName) => {
+    const positionCandidates = candidates
+      .filter((c) => c.position === positionName)
+      .map((candidate) => ({
+        ...candidate,
+        voteCount: getCandidateVotes(candidate.id),
+      }))
+      .sort((a, b) => b.voteCount - a.voteCount); // Sort by votes descending
+
+    const totalVotes = positionCandidates.reduce((sum, c) => sum + c.voteCount, 0);
+
+    return positionCandidates.map((candidate, index) => ({
+      ...candidate,
+      rank: index + 1,
+      percentage: totalVotes > 0 ? ((candidate.voteCount / totalVotes) * 100).toFixed(1) : 0,
+    }));
   };
 
   if (loading) {
@@ -217,11 +400,39 @@ const AdminDashboard = () => {
         <div className="demographics-grid">
           <div className="chart-card">
             <h4 className="chart-title">Voting by Year Level</h4>
-            <div className="chart-placeholder">Chart will be displayed here</div>
+            {yearLevelData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={yearLevelData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="Voted" fill="#48bb78" />
+                  <Bar dataKey="Not Voted" fill="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="chart-placeholder">No data available</div>
+            )}
           </div>
           <div className="chart-card">
             <h4 className="chart-title">Voting by School</h4>
-            <div className="chart-placeholder">Chart will be displayed here</div>
+            {schoolData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={schoolData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="Voted" fill="#48bb78" />
+                  <Bar dataKey="Not Voted" fill="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="chart-placeholder">No data available</div>
+            )}
           </div>
         </div>
       </div>
@@ -235,79 +446,52 @@ const AdminDashboard = () => {
           </select>
         </div>
 
-        {/* President Position */}
-        <div className="position-section">
-          <div className="position-header">
-            <h4 className="position-name">President</h4>
-            <p className="position-info">Total Votes: 0 | Winners Needed: 1</p>
+        {positions.length === 0 ? (
+          <div className="empty-state">
+            <p>No positions created yet. Go to Manage Candidates to add positions.</p>
           </div>
-          <div className="candidate-list">
-            <div className="candidate-item">
-              <div className="candidate-rank first">#1</div>
-              <div className="candidate-name">Sarah Lim</div>
-              <div className="candidate-votes">0 votes</div>
-              <div className="vote-bar">
-                <div className="vote-bar-fill" style={{ width: '0%' }}></div>
-              </div>
-              <div className="candidate-percentage">0%</div>
-            </div>
-            <div className="candidate-item">
-              <div className="candidate-rank other">#2</div>
-              <div className="candidate-name">Maria Santos</div>
-              <div className="candidate-votes">0 votes</div>
-              <div className="vote-bar">
-                <div className="vote-bar-fill" style={{ width: '0%' }}></div>
-              </div>
-              <div className="candidate-percentage">0%</div>
-            </div>
-            <div className="candidate-item">
-              <div className="candidate-rank other">#3</div>
-              <div className="candidate-name">Juan dela Cruz</div>
-              <div className="candidate-votes">0 votes</div>
-              <div className="vote-bar">
-                <div className="vote-bar-fill" style={{ width: '0%' }}></div>
-              </div>
-              <div className="candidate-percentage">0%</div>
-            </div>
-          </div>
-        </div>
+        ) : (
+          positions.map((position) => {
+            const positionCandidates = getCandidatesForPosition(position.name);
+            const totalVotes = positionCandidates.reduce((sum, c) => sum + c.voteCount, 0);
 
-        {/* Vice President Position */}
-        <div className="position-section">
-          <div className="position-header">
-            <h4 className="position-name">Vice President</h4>
-            <p className="position-info">Total Votes: 0 | Winners Needed: 1</p>
-          </div>
-          <div className="candidate-list">
-            <div className="candidate-item">
-              <div className="candidate-rank first">#1</div>
-              <div className="candidate-name">Miguel Reyes</div>
-              <div className="candidate-votes">0 votes</div>
-              <div className="vote-bar">
-                <div className="vote-bar-fill" style={{ width: '0%' }}></div>
+            return (
+              <div key={position.id} className="position-section">
+                <div className="position-header">
+                  <h4 className="position-name">{position.name}</h4>
+                  <p className="position-info">
+                    Total Votes: {totalVotes} | Winners Needed: {position.maxSelection || 1}
+                  </p>
+                </div>
+                <div className="candidate-list">
+                  {positionCandidates.length === 0 ? (
+                    <p className="no-candidates">No candidates for this position yet</p>
+                  ) : (
+                    positionCandidates.map((candidate) => (
+                      <div
+                        key={candidate.id}
+                        className={`candidate-item ${candidate.rank === 1 ? 'first-place' : ''}`}
+                      >
+                        <div className={`candidate-rank ${candidate.rank === 1 ? 'first' : 'other'}`}>
+                          #{candidate.rank}
+                        </div>
+                        <div className="candidate-name">{candidate.name}</div>
+                        <div className="candidate-votes">{candidate.voteCount} votes</div>
+                        <div className="vote-bar">
+                          <div
+                            className="vote-bar-fill"
+                            style={{ width: `${candidate.percentage}%` }}
+                          ></div>
+                        </div>
+                        <div className="candidate-percentage">{candidate.percentage}%</div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-              <div className="candidate-percentage">0%</div>
-            </div>
-            <div className="candidate-item">
-              <div className="candidate-rank other">#2</div>
-              <div className="candidate-name">David Chen</div>
-              <div className="candidate-votes">0 votes</div>
-              <div className="vote-bar">
-                <div className="vote-bar-fill" style={{ width: '0%' }}></div>
-              </div>
-              <div className="candidate-percentage">0%</div>
-            </div>
-            <div className="candidate-item">
-              <div className="candidate-rank other">#3</div>
-              <div className="candidate-name">Andrea Tan</div>
-              <div className="candidate-votes">0 votes</div>
-              <div className="vote-bar">
-                <div className="vote-bar-fill" style={{ width: '0%' }}></div>
-              </div>
-              <div className="candidate-percentage">0%</div>
-            </div>
-          </div>
-        </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

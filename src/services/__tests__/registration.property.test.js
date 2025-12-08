@@ -102,7 +102,7 @@ describe('Property 1: Registration validation rejects incomplete data', () => {
           studentId: fc.string({ minLength: 5, maxLength: 15 }),
           birthdate: fc.date(),
           yearLevel: fc.constantFrom('1st Year', '2nd Year', '3rd Year', '4th Year'),
-          school: fc.constantFrom('SOB', 'SOTE', 'SAST', 'SOCJ'),
+          school: fc.constantFrom('SOB', 'SOTE', 'SOAST', 'SOCJ'),
         }),
         async (data) => {
           // Make passwords match
@@ -132,7 +132,7 @@ describe('Property 1: Registration validation rejects incomplete data', () => {
           studentId: fc.string({ minLength: 5, maxLength: 15 }),
           birthdate: fc.date(),
           yearLevel: fc.constantFrom('1st Year', '2nd Year', '3rd Year', '4th Year'),
-          school: fc.constantFrom('SOB', 'SOTE', 'SAST', 'SOCJ'),
+          school: fc.constantFrom('SOB', 'SOTE', 'SOAST', 'SOCJ'),
         }),
         async (data) => {
           data.confirmPassword = data.password;
@@ -160,7 +160,7 @@ describe('Property 1: Registration validation rejects incomplete data', () => {
           studentId: fc.string({ minLength: 5, maxLength: 15 }),
           birthdate: fc.date(),
           yearLevel: fc.constantFrom('1st Year', '2nd Year', '3rd Year', '4th Year'),
-          school: fc.constantFrom('SOB', 'SOTE', 'SAST', 'SOCJ'),
+          school: fc.constantFrom('SOB', 'SOTE', 'SOAST', 'SOCJ'),
         }),
         async (data) => {
           data.confirmPassword = data.password;
@@ -187,7 +187,7 @@ describe('Property 1: Registration validation rejects incomplete data', () => {
           studentId: fc.string({ minLength: 5, maxLength: 15 }),
           birthdate: fc.date(),
           yearLevel: fc.constantFrom('1st Year', '2nd Year', '3rd Year', '4th Year'),
-          school: fc.constantFrom('SOB', 'SOTE', 'SAST', 'SOCJ'),
+          school: fc.constantFrom('SOB', 'SOTE', 'SOAST', 'SOCJ'),
         }),
         async (data) => {
           data.confirmPassword = data.password;
@@ -215,7 +215,7 @@ describe('Property 1: Registration validation rejects incomplete data', () => {
           studentId: fc.string({ minLength: 5, maxLength: 15 }),
           birthdate: fc.date(),
           yearLevel: fc.constantFrom('1st Year', '2nd Year', '3rd Year', '4th Year'),
-          school: fc.constantFrom('SOB', 'SOTE', 'SAST', 'SOCJ'),
+          school: fc.constantFrom('SOB', 'SOTE', 'SOAST', 'SOCJ'),
         }),
         async (data) => {
           // Ensure passwords don't match
@@ -246,7 +246,7 @@ describe('Property 1: Registration validation rejects incomplete data', () => {
           studentId: fc.constant(''), // Empty student ID
           birthdate: fc.date(),
           yearLevel: fc.constantFrom('1st Year', '2nd Year', '3rd Year', '4th Year'),
-          school: fc.constantFrom('SOB', 'SOTE', 'SAST', 'SOCJ'),
+          school: fc.constantFrom('SOB', 'SOTE', 'SOAST', 'SOCJ'),
         }),
         async (data) => {
           data.confirmPassword = data.password;
@@ -274,7 +274,7 @@ describe('Property 1: Registration validation rejects incomplete data', () => {
           studentId: fc.string({ minLength: 5, maxLength: 15 }),
           birthdate: fc.date(),
           yearLevel: fc.constant(null), // Missing year level
-          school: fc.constantFrom('SOB', 'SOTE', 'SAST', 'SOCJ'),
+          school: fc.constantFrom('SOB', 'SOTE', 'SOAST', 'SOCJ'),
         }),
         async (data) => {
           data.confirmPassword = data.password;
@@ -329,7 +329,7 @@ describe('Property 1: Registration validation rejects incomplete data', () => {
           studentId: fc.string({ minLength: 5, maxLength: 15 }),
           birthdate: fc.date(),
           yearLevel: fc.constantFrom('1st Year', '2nd Year', '3rd Year', '4th Year'),
-          school: fc.constantFrom('SOB', 'SOTE', 'SAST', 'SOCJ'),
+          school: fc.constantFrom('SOB', 'SOTE', 'SOAST', 'SOCJ'),
         }),
         async (data) => {
           // Make passwords match
@@ -346,3 +346,4 @@ describe('Property 1: Registration validation rejects incomplete data', () => {
     );
   });
 });
+

@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
+import Logo from '../components/Logo';
+import FloatingBottomNavbar from '../components/FloatingBottomNavbar';
+import FloatingCountdownTimer from '../components/FloatingCountdownTimer';
+import './VoterProfilePage.css';
 
 const VoterProfilePage = () => {
   const navigate = useNavigate();
@@ -17,9 +21,35 @@ const VoterProfilePage = () => {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+  const [election, setElection] = useState(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receipt, setReceipt] = useState(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
 
   useEffect(() => {
     fetchVoterProfile();
+  }, []);
+
+  useEffect(() => {
+    // Set up real-time listener for active election
+    const electionsRef = collection(db, 'elections');
+    const activeElectionQuery = query(electionsRef, where('status', '==', 'active'));
+
+    const unsubscribeElection = onSnapshot(activeElectionQuery, (electionSnapshot) => {
+      if (!electionSnapshot.empty) {
+        const electionData = {
+          id: electionSnapshot.docs[0].id,
+          ...electionSnapshot.docs[0].data(),
+        };
+        setElection(electionData);
+      } else {
+        setElection(null);
+      }
+    });
+
+    return () => {
+      unsubscribeElection();
+    };
   }, []);
 
   const fetchVoterProfile = async () => {
@@ -46,10 +76,52 @@ const VoterProfilePage = () => {
     }
   };
 
-  const handleGenerateReceipt = () => {
-    if (voterData?.hasVoted) {
-      navigate('/voter/vote-receipt');
+  const handleGenerateReceipt = async () => {
+    if (!voterData?.hasVoted) return;
+
+    try {
+      setLoadingReceipt(true);
+      const user = auth.currentUser;
+
+      if (!user) return;
+
+      // Fetch vote receipt for current user
+      const receiptsRef = collection(db, 'vote_receipts');
+      const receiptQuery = query(receiptsRef, where('voterId', '==', user.uid));
+      const receiptSnapshot = await getDocs(receiptQuery);
+
+      if (!receiptSnapshot.empty) {
+        const receiptData = {
+          id: receiptSnapshot.docs[0].id,
+          ...receiptSnapshot.docs[0].data(),
+        };
+        setReceipt(receiptData);
+        setShowReceiptModal(true);
+      }
+
+      setLoadingReceipt(false);
+    } catch (err) {
+      console.error('Error fetching vote receipt:', err);
+      setLoadingReceipt(false);
     }
+  };
+
+  const handleCloseReceiptModal = () => {
+    setShowReceiptModal(false);
+  };
+
+  const groupByPosition = () => {
+    if (!receipt || !receipt.candidates) return {};
+
+    const grouped = {};
+    receipt.candidates.forEach((candidate) => {
+      const positionName = candidate.positionName || 'Unknown Position';
+      if (!grouped[positionName]) {
+        grouped[positionName] = [];
+      }
+      grouped[positionName].push(candidate);
+    });
+    return grouped;
   };
 
   const handleChangePassword = () => {
@@ -137,47 +209,90 @@ const VoterProfilePage = () => {
     }
   };
 
+  const getTargetDate = () => {
+    if (!election) return null;
+    
+    const now = new Date();
+    const startTime = election.startTime?.toDate();
+    const endTime = election.endTime?.toDate();
+
+    if (startTime && now < startTime) {
+      return startTime;
+    } else if (endTime && now < endTime) {
+      return endTime;
+    }
+    
+    return null;
+  };
+
+  const getVotingStatus = () => {
+    if (!election) return 'closed';
+    
+    const now = new Date();
+    const startTime = election.startTime?.toDate();
+    const endTime = election.endTime?.toDate();
+
+    if (startTime && endTime) {
+      if (now < startTime) return 'upcoming';
+      if (now >= startTime && now <= endTime) return 'active';
+    }
+    
+    return 'closed';
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading profile...</p>
+      <div className="profile-page">
+        <Logo />
+        <FloatingCountdownTimer targetDate={getTargetDate()} votingStatus={getVotingStatus()} />
+        <div className="profile-loading">
+          <div className="loading-spinner"></div>
+          <p>Loading profile...</p>
         </div>
+        <FloatingBottomNavbar />
       </div>
     );
   }
 
   if (!voterData) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-gray-600">Profile not found</p>
+      <div className="profile-page">
+        <Logo />
+        <FloatingCountdownTimer targetDate={getTargetDate()} votingStatus={getVotingStatus()} />
+        <div className="profile-loading">
+          <p>Profile not found</p>
         </div>
+        <FloatingBottomNavbar />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
+    <div className="profile-page">
+      {/* Logo */}
+      <Logo />
+
+      {/* Floating Countdown Timer */}
+      <FloatingCountdownTimer targetDate={getTargetDate()} votingStatus={getVotingStatus()} />
+
+      <div className="profile-content">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 text-center">
+        <div className="profile-header">
+          <h1 className="profile-title">
             {voterData.fullName || 'Voter Profile'}
           </h1>
         </div>
 
         {/* Vote Status Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Vote Status</h2>
-          <div className="flex items-center justify-between">
+        <div className="profile-section">
+          <h2 className="profile-section-title">Vote Status</h2>
+          <div className="vote-status-container">
             <div>
-              <p className="text-gray-600 mb-2">Voting Status:</p>
+              <p className="vote-status-label">Voting Status:</p>
               {voterData.hasVoted ? (
                 <div>
-                  <span className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg font-semibold">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <span className="status-badge status-voted">
+                    <svg className="status-icon" fill="currentColor" viewBox="0 0 20 20">
                       <path
                         fillRule="evenodd"
                         d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -187,15 +302,15 @@ const VoterProfilePage = () => {
                     VOTED
                   </span>
                   {voterData.votedAt && (
-                    <p className="text-sm text-gray-600 mt-2">
+                    <p className="vote-timestamp">
                       Voted on {voterData.votedAt.toDate().toLocaleDateString()} at{' '}
                       {voterData.votedAt.toDate().toLocaleTimeString()}
                     </p>
                   )}
                 </div>
               ) : (
-                <span className="inline-flex items-center gap-2 bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg font-semibold">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <span className="status-badge status-not-voted">
+                  <svg className="status-icon" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
                       d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -209,45 +324,46 @@ const VoterProfilePage = () => {
             {voterData.hasVoted && (
               <button
                 onClick={handleGenerateReceipt}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                className="profile-btn-receipt"
+                disabled={loadingReceipt}
               >
-                Generate Receipt
+                {loadingReceipt ? 'Loading...' : 'Generate Receipt'}
               </button>
             )}
           </div>
         </div>
 
         {/* Account Information Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Account Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Student ID</p>
-              <p className="text-gray-800 font-semibold">{voterData.studentId || 'N/A'}</p>
+        <div className="profile-section">
+          <h2 className="profile-section-title">Account Information</h2>
+          <div className="profile-info-grid">
+            <div className="profile-info-item">
+              <p className="profile-info-label">Student ID</p>
+              <p className="profile-info-value">{voterData.studentId || 'N/A'}</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Email</p>
-              <p className="text-gray-800 font-semibold">{voterData.email || 'N/A'}</p>
+            <div className="profile-info-item">
+              <p className="profile-info-label">Email</p>
+              <p className="profile-info-value">{voterData.email || 'N/A'}</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Birthdate</p>
-              <p className="text-gray-800 font-semibold">
+            <div className="profile-info-item">
+              <p className="profile-info-label">Birthdate</p>
+              <p className="profile-info-value">
                 {voterData.birthdate
                   ? new Date(voterData.birthdate).toLocaleDateString()
                   : 'N/A'}
               </p>
             </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Year Level</p>
-              <p className="text-gray-800 font-semibold">{voterData.yearLevel || 'N/A'}</p>
+            <div className="profile-info-item">
+              <p className="profile-info-label">Year Level</p>
+              <p className="profile-info-value">{voterData.yearLevel || 'N/A'}</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">School</p>
-              <p className="text-gray-800 font-semibold">{voterData.school || 'N/A'}</p>
+            <div className="profile-info-item">
+              <p className="profile-info-label">School</p>
+              <p className="profile-info-value">{voterData.school || 'N/A'}</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Registration Date</p>
-              <p className="text-gray-800 font-semibold">
+            <div className="profile-info-item">
+              <p className="profile-info-label">Registration Date</p>
+              <p className="profile-info-value">
                 {voterData.createdAt
                   ? voterData.createdAt.toDate().toLocaleDateString()
                   : 'N/A'}
@@ -257,104 +373,190 @@ const VoterProfilePage = () => {
         </div>
 
         {/* Action Buttons */}
-        <div className="space-y-4">
+        <div className="profile-actions">
           <button
             onClick={handleChangePassword}
-            className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            className="profile-btn profile-btn-primary"
           >
             Change Password
           </button>
           <button
             onClick={handleLogout}
-            className="w-full bg-red-600 text-white py-4 rounded-lg font-semibold hover:bg-red-700 transition-colors"
+            className="profile-btn profile-btn-logout"
           >
             LOGOUT
           </button>
         </div>
-
-        {/* Change Password Modal */}
-        {showPasswordModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Change Password</h3>
-
-              {passwordError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                  <p className="text-red-800 text-sm">{passwordError}</p>
-                </div>
-              )}
-
-              {passwordSuccess && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-                  <p className="text-green-800 text-sm">{passwordSuccess}</p>
-                </div>
-              )}
-
-              <form onSubmit={handleSubmitPasswordChange}>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Current Password
-                    </label>
-                    <input
-                      type="password"
-                      name="currentPassword"
-                      value={passwordForm.currentPassword}
-                      onChange={handlePasswordFormChange}
-                      required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      New Password
-                    </label>
-                    <input
-                      type="password"
-                      name="newPassword"
-                      value={passwordForm.newPassword}
-                      onChange={handlePasswordFormChange}
-                      required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Confirm New Password
-                    </label>
-                    <input
-                      type="password"
-                      name="confirmPassword"
-                      value={passwordForm.confirmPassword}
-                      onChange={handlePasswordFormChange}
-                      required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-4 mt-6">
-                  <button
-                    type="button"
-                    onClick={handleClosePasswordModal}
-                    disabled={changingPassword}
-                    className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={changingPassword}
-                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
-                  >
-                    {changingPassword ? 'Changing...' : 'Change Password'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Floating Bottom Navbar */}
+      <FloatingBottomNavbar />
+
+      {/* Vote Receipt Modal */}
+      {showReceiptModal && receipt && (
+        <div className="profile-modal-overlay" onClick={handleCloseReceiptModal}>
+          <div className="receipt-modal-container" onClick={(e) => e.stopPropagation()}>
+            {/* Green Check Icon */}
+            <div className="receipt-check-icon">
+              <svg viewBox="0 0 24 24" fill="white">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+              </svg>
+            </div>
+
+            {/* Title */}
+            <h1 className="receipt-title">VOTE RECEIPT</h1>
+            <p className="receipt-subtitle">Your vote has been recorded</p>
+
+            {/* Divider */}
+            <div className="receipt-divider"></div>
+
+            {/* Receipt Information */}
+            <div className="receipt-info-section">
+              <h2 className="receipt-section-title">Receipt Information</h2>
+              <div className="receipt-info-row">
+                <span className="receipt-info-label">Student ID:</span>
+                <span className="receipt-info-value">{voterData.email}</span>
+              </div>
+              {receipt.timestamp && (
+                <div className="receipt-info-row">
+                  <span className="receipt-info-label">Submitted on:</span>
+                  <span className="receipt-info-value">
+                    {receipt.timestamp.toDate().toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric', 
+                      year: 'numeric' 
+                    })} {receipt.timestamp.toDate().toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      hour12: true 
+                    }).toUpperCase()}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Your Votes Section */}
+            <div className="receipt-votes-section">
+              <h2 className="receipt-section-title">Your Votes</h2>
+              <div className="receipt-votes-list">
+                {Object.entries(groupByPosition()).map(([positionName, candidates]) => (
+                  <div key={positionName} className="receipt-vote-card">
+                    <h3 className="receipt-position-name">{positionName}</h3>
+                    {candidates.map((candidate, index) => (
+                      <div key={index} className="receipt-candidate-item">
+                        <span className="receipt-bullet">•</span>
+                        <span className="receipt-candidate-name">{candidate.candidateName}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Notice */}
+            <div className="receipt-notice">
+              <svg className="receipt-notice-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+              </svg>
+              <div className="receipt-notice-text">
+                <p>This receipt confirms your vote was recorded.</p>
+                <p>Your actual selections remain confidential.</p>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <button onClick={handleCloseReceiptModal} className="receipt-btn-close">
+              CLOSED
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <div className="profile-modal-overlay" onClick={handleClosePasswordModal}>
+          <div className="profile-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="profile-modal-close" onClick={handleClosePasswordModal}>
+              ✕
+            </button>
+            <h3 className="profile-modal-title">Change Password</h3>
+
+            {passwordError && (
+              <div className="profile-alert profile-alert-error">
+                <p>{passwordError}</p>
+              </div>
+            )}
+
+            {passwordSuccess && (
+              <div className="profile-alert profile-alert-success">
+                <p>{passwordSuccess}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitPasswordChange}>
+              <div className="profile-form-group">
+                <div className="profile-input-group">
+                  <label className="profile-label">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    name="currentPassword"
+                    value={passwordForm.currentPassword}
+                    onChange={handlePasswordFormChange}
+                    required
+                    className="profile-input"
+                  />
+                </div>
+                <div className="profile-input-group">
+                  <label className="profile-label">
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    name="newPassword"
+                    value={passwordForm.newPassword}
+                    onChange={handlePasswordFormChange}
+                    required
+                    className="profile-input"
+                  />
+                </div>
+                <div className="profile-input-group">
+                  <label className="profile-label">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    value={passwordForm.confirmPassword}
+                    onChange={handlePasswordFormChange}
+                    required
+                    className="profile-input"
+                  />
+                </div>
+              </div>
+
+              <div className="profile-modal-actions">
+                <button
+                  type="button"
+                  onClick={handleClosePasswordModal}
+                  disabled={changingPassword}
+                  className="profile-btn profile-btn-cancel"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={changingPassword}
+                  className="profile-btn profile-btn-submit"
+                >
+                  {changingPassword ? 'Changing...' : 'Change Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

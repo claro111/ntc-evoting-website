@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, getCountFromServer, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { approveVoter, rejectVoter, deleteVoterPermanently } from '../services/voterService';
+import { approveVoter, rejectVoter } from '../services/voterService';
 import './ManageVotersPage.css';
 
 const ManageVotersPage = () => {
@@ -32,9 +32,7 @@ const ManageVotersPage = () => {
   };
 
   const handleApproveReject = async () => {
-    // Refresh data after approval/rejection
-    await fetchVoterStats();
-    await fetchVoters();
+    // No need to refresh - real-time listeners will update automatically
     handleCloseModal();
   };
 
@@ -59,97 +57,71 @@ const ManageVotersPage = () => {
   };
 
   const handleEditSuccess = async () => {
-    await fetchVoterStats();
-    await fetchVoters();
+    // No need to refresh - real-time listeners will update automatically
     handleCloseEditModal();
   };
 
   const handleDeleteSuccess = async () => {
-    await fetchVoterStats();
-    await fetchVoters();
+    // No need to refresh - real-time listeners will update automatically
     handleCloseDeleteModal();
   };
 
   useEffect(() => {
-    fetchVoterStats();
-    fetchVoters();
-  }, []);
+    setLoading(true);
+    const votersRef = collection(db, 'voters');
 
-  const fetchVoterStats = async () => {
-    try {
-      const votersRef = collection(db, 'voters');
-
-      // Pending reviews count
-      const pendingQuery = query(votersRef, where('status', '==', 'pending'));
-      const pendingSnapshot = await getCountFromServer(pendingQuery);
-      const pendingReviews = pendingSnapshot.data().count;
-
-      // Registered voters count
-      const registeredQuery = query(
-        votersRef,
-        where('status', '==', 'registered'),
-        where('emailVerified', '==', true)
-      );
-      const registeredSnapshot = await getCountFromServer(registeredQuery);
-      const registeredVoters = registeredSnapshot.data().count;
-
-      // Deactivated voters count
-      const deactivatedQuery = query(votersRef, where('status', '==', 'deactivated'));
-      const deactivatedSnapshot = await getCountFromServer(deactivatedQuery);
-      const deactivatedVoters = deactivatedSnapshot.data().count;
-
-      setStats({
-        pendingReviews,
-        registeredVoters,
-        deactivatedVoters,
-      });
-    } catch (err) {
-      console.error('Error fetching voter stats:', err);
-    }
-  };
-
-  const fetchVoters = async () => {
-    try {
-      setLoading(true);
-      const votersRef = collection(db, 'voters');
-
-      // Fetch pending voters
-      const pendingQuery = query(votersRef, where('status', '==', 'pending'));
-      const pendingSnapshot = await getDocs(pendingQuery);
-      const pending = pendingSnapshot.docs.map((doc) => ({
+    // Real-time listener for pending voters
+    const pendingQuery = query(votersRef, where('status', '==', 'pending'));
+    const unsubscribePending = onSnapshot(pendingQuery, (snapshot) => {
+      const pending = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setPendingVoters(pending);
+      setStats((prev) => ({ ...prev, pendingReviews: pending.length }));
+      setLoading(false);
+    }, (err) => {
+      console.error('Error fetching pending voters:', err);
+      setLoading(false);
+    });
 
-      // Fetch registered voters
-      const registeredQuery = query(
-        votersRef,
-        where('status', '==', 'registered'),
-        where('emailVerified', '==', true)
-      );
-      const registeredSnapshot = await getDocs(registeredQuery);
-      const registered = registeredSnapshot.docs.map((doc) => ({
+    // Real-time listener for registered voters
+    const registeredQuery = query(
+      votersRef,
+      where('status', '==', 'registered'),
+      where('emailVerified', '==', true)
+    );
+    const unsubscribeRegistered = onSnapshot(registeredQuery, (snapshot) => {
+      const registered = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setRegisteredVoters(registered);
+      setStats((prev) => ({ ...prev, registeredVoters: registered.length }));
+    }, (err) => {
+      console.error('Error fetching registered voters:', err);
+    });
 
-      // Fetch deactivated voters
-      const deactivatedQuery = query(votersRef, where('status', '==', 'deactivated'));
-      const deactivatedSnapshot = await getDocs(deactivatedQuery);
-      const deactivated = deactivatedSnapshot.docs.map((doc) => ({
+    // Real-time listener for deactivated voters
+    const deactivatedQuery = query(votersRef, where('status', '==', 'deactivated'));
+    const unsubscribeDeactivated = onSnapshot(deactivatedQuery, (snapshot) => {
+      const deactivated = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setDeactivatedVoters(deactivated);
+      setStats((prev) => ({ ...prev, deactivatedVoters: deactivated.length }));
+    }, (err) => {
+      console.error('Error fetching deactivated voters:', err);
+    });
 
-      setLoading(false);
-    } catch (err) {
-      console.error('Error fetching voters:', err);
-      setLoading(false);
-    }
-  };
+    // Cleanup function to unsubscribe from all listeners
+    return () => {
+      unsubscribePending();
+      unsubscribeRegistered();
+      unsubscribeDeactivated();
+    };
+  }, []);
 
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
@@ -324,10 +296,6 @@ const ManageVotersPage = () => {
           <DeactivatedVotersTab 
             voters={filterVoters(deactivatedVoters)} 
             formatDate={formatDate}
-            onDeletePermanently={async () => {
-              await fetchVoterStats();
-              await fetchVoters();
-            }}
           />
         )}
       </div>
@@ -499,7 +467,7 @@ const RegisteredVotersTab = ({ voters, formatDate, onEditClick, onDeleteClick })
 };
 
 // Deactivated Voters Tab Component
-const DeactivatedVotersTab = ({ voters, formatDate, onDeletePermanently }) => {
+const DeactivatedVotersTab = ({ voters, formatDate }) => {
   const [reactivating, setReactivating] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -534,7 +502,7 @@ const DeactivatedVotersTab = ({ voters, formatDate, onDeletePermanently }) => {
 
       await updateDoc(voterRef, updateData);
       
-      window.location.reload(); // Refresh the page to update the lists
+      // No need to reload - real-time listeners will update automatically
     } catch (err) {
       console.error('Error reactivating voter:', err);
       alert('Failed to reactivate voter. Please try again.');
@@ -553,17 +521,14 @@ const DeactivatedVotersTab = ({ voters, formatDate, onDeletePermanently }) => {
     try {
       setDeleting(selectedVoter.id);
 
-      // Delete Firestore document
       const voterRef = doc(db, 'voters', selectedVoter.id);
       await deleteDoc(voterRef);
       
-      alert(`${selectedVoter.fullName} has been permanently deleted from Firestore.\n\nNote: To also delete the Firebase Authentication user, go to Firebase Console → Authentication → Users and manually delete the user with email: ${selectedVoter.email}`);
+      alert(`${selectedVoter.fullName} has been permanently deleted from the system.`);
       setShowDeleteModal(false);
       setSelectedVoter(null);
       
-      if (onDeletePermanently) {
-        await onDeletePermanently();
-      }
+      // No need to refresh - real-time listeners will update automatically
     } catch (err) {
       console.error('Error permanently deleting voter:', err);
       alert('Failed to permanently delete voter. Please try again.');
@@ -940,6 +905,34 @@ const EditVoterModal = ({ voter, onClose, onSuccess }) => {
     }
   };
 
+  const handleDeactivate = async () => {
+    const reason = prompt('Enter deactivation reason (optional):');
+    
+    if (!window.confirm(`Are you sure you want to deactivate ${voter.fullName}?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+
+      const voterRef = doc(db, 'voters', voter.id);
+      await updateDoc(voterRef, {
+        status: 'deactivated',
+        deactivatedAt: Timestamp.now(),
+        deactivatedReason: reason || 'Deactivated by administrator',
+        updatedAt: Timestamp.now(),
+      });
+
+      alert('Voter has been deactivated successfully.');
+      onSuccess();
+    } catch (err) {
+      console.error('Error deactivating voter:', err);
+      setError(err.message || 'Failed to deactivate voter. Please try again.');
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1024,7 +1017,7 @@ const EditVoterModal = ({ voter, onClose, onSuccess }) => {
                 <option value="">Select School</option>
                 <option value="SOB">School of Business (SOB)</option>
                 <option value="SOTE">School of Teacher Education (SOTE)</option>
-                <option value="SAST">School of Arts, Sciences and Technology (SAST)</option>
+                <option value="SOAST">School of Arts, Sciences and Technology (SOAST)</option>
                 <option value="SOCJ">School of Criminal Justice (SOCJ)</option>
               </select>
             </div>
@@ -1052,6 +1045,14 @@ const EditVoterModal = ({ voter, onClose, onSuccess }) => {
               disabled={loading}
             >
               {loading ? 'Saving...' : 'Save Changes'}
+            </button>
+            <button
+              type="button"
+              className="btn-reject"
+              onClick={handleDeactivate}
+              disabled={loading}
+            >
+              {loading ? 'Processing...' : 'Deactivate Account'}
             </button>
             <button
               type="button"

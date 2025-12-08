@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
+import './VoteReceiptPage.css';
 
 const VoteReceiptPage = () => {
   const navigate = useNavigate();
   const [receipt, setReceipt] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [voterEmail, setVoterEmail] = useState('');
 
   useEffect(() => {
     fetchVoteReceipt();
@@ -22,6 +24,15 @@ const VoteReceiptPage = () => {
         setError('User not authenticated');
         setLoading(false);
         return;
+      }
+
+      // Fetch voter data for email
+      const voterRef = doc(db, 'voters', user.uid);
+      const voterDoc = await getDoc(voterRef);
+      if (voterDoc.exists()) {
+        setVoterEmail(voterDoc.data().email || user.email);
+      } else {
+        setVoterEmail(user.email);
       }
 
       // Fetch vote receipt for current user
@@ -67,10 +78,10 @@ const VoteReceiptPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading receipt...</p>
+      <div className="receipt-page">
+        <div className="receipt-loading">
+          <div className="loading-spinner"></div>
+          <p>Loading receipt...</p>
         </div>
       </div>
     );
@@ -78,29 +89,19 @@ const VoteReceiptPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
-          <div className="mb-4">
-            <svg
-              className="w-16 h-16 text-red-500 mx-auto"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Error</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button
-            onClick={handleClose}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-          >
+      <div className="receipt-page">
+        <div className="receipt-error">
+          <svg className="error-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <h2>Error</h2>
+          <p>{error}</p>
+          <button onClick={handleClose} className="receipt-btn-close">
             Go Back
           </button>
         </div>
@@ -112,115 +113,79 @@ const VoteReceiptPage = () => {
   const timestamp = receipt?.timestamp?.toDate();
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-              <svg
-                className="w-8 h-8 text-green-600"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            <h1 className="text-3xl font-bold text-gray-800">VOTE RECEIPT</h1>
-          </div>
+    <div className="receipt-page">
+      <div className="receipt-container">
+        {/* Green Check Icon */}
+        <div className="receipt-check-icon">
+          <svg viewBox="0 0 24 24" fill="white">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+          </svg>
+        </div>
 
-          {/* Message Information */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800 text-center">
-              This receipt confirms your vote was successfully recorded.
-            </p>
-            {timestamp && (
-              <p className="text-sm text-blue-600 text-center mt-2">
-                Submitted on {timestamp.toLocaleDateString()} at{' '}
-                {timestamp.toLocaleTimeString()}
-              </p>
-            )}
+        {/* Title */}
+        <h1 className="receipt-title">VOTE RECEIPT</h1>
+        <p className="receipt-subtitle">Your vote has been recorded</p>
+
+        {/* Divider */}
+        <div className="receipt-divider"></div>
+
+        {/* Receipt Information */}
+        <div className="receipt-info-section">
+          <h2 className="receipt-section-title">Receipt Information</h2>
+          <div className="receipt-info-row">
+            <span className="receipt-info-label">Student ID:</span>
+            <span className="receipt-info-value">{voterEmail}</span>
           </div>
+          {timestamp && (
+            <div className="receipt-info-row">
+              <span className="receipt-info-label">Submitted on:</span>
+              <span className="receipt-info-value">
+                {timestamp.toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                })} {timestamp.toLocaleTimeString('en-US', { 
+                  hour: '2-digit', 
+                  minute: '2-digit',
+                  hour12: true 
+                }).toUpperCase()}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Your Votes Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Your Votes</h2>
-
-          <div className="space-y-6">
+        <div className="receipt-votes-section">
+          <h2 className="receipt-section-title">Your Votes</h2>
+          <div className="receipt-votes-list">
             {Object.entries(groupedCandidates).map(([positionName, candidates]) => (
-              <div key={positionName} className="border-b border-gray-200 pb-4 last:border-b-0">
-                <h3 className="text-lg font-semibold text-blue-600 mb-3">
-                  {positionName}
-                </h3>
-                <div className="space-y-2">
-                  {candidates.map((candidate, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex-shrink-0">
-                        <svg
-                          className="w-6 h-6 text-green-600"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-gray-800">
-                          {candidate.candidateName}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div key={positionName} className="receipt-vote-card">
+                <h3 className="receipt-position-name">{positionName}</h3>
+                {candidates.map((candidate, index) => (
+                  <div key={index} className="receipt-candidate-item">
+                    <span className="receipt-bullet">•</span>
+                    <span className="receipt-candidate-name">{candidate.candidateName}</span>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
         </div>
 
         {/* Notice */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-          <div className="flex gap-3">
-            <svg
-              className="w-6 h-6 text-yellow-600 flex-shrink-0"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <div>
-              <p className="text-sm font-semibold text-yellow-800 mb-1">
-                Important Notice
-              </p>
-              <p className="text-sm text-yellow-700">
-                Your vote has been recorded and cannot be changed. This receipt is for
-                your records only and does not affect the anonymity of your vote.
-              </p>
-            </div>
+        <div className="receipt-notice">
+          <svg className="receipt-notice-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          </svg>
+          <div className="receipt-notice-text">
+            <p>This receipt confirms your vote was recorded.</p>
+            <p>Your actual selections remain confidential.</p>
           </div>
         </div>
 
         {/* Close Button */}
-        <button
-          onClick={handleClose}
-          className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-colors"
-        >
-          CLOSE
+        <button onClick={handleClose} className="receipt-btn-close">
+          CLOSED
         </button>
       </div>
     </div>

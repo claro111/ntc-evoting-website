@@ -45,15 +45,16 @@ service cloud.firestore {
     
     // Announcements collection
     match /announcements/{announcementId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow read: if request.auth != null;  // Any authenticated user (voters and admins) can read
+      allow write: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));  // Only admins can write
     }
     
     // Votes collection
     match /votes/{voteId} {
       allow read: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
       allow create: if request.auth != null;
-      allow update, delete: if false;  // Votes cannot be modified or deleted
+      allow update: if false;  // Votes cannot be modified
+      allow delete: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));  // Admins can delete for system reset
     }
     
     // Vote receipts collection
@@ -61,7 +62,8 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == resource.data.voterId;
       allow read: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
       allow create: if request.auth != null;
-      allow update, delete: if false;  // Receipts cannot be modified or deleted
+      allow update: if false;  // Receipts cannot be modified
+      allow delete: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));  // Admins can delete for system reset
     }
   }
 }

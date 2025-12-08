@@ -1,0 +1,150 @@
+.confirmation-page {
+  min-height: 100%;
+  background-color: white;
+  padding-bottom: 220px;
+  position: relative;
+}
+
+/* Progress Bar */
+.confirmation-progress-container {
+  max-width: 900px;
+  margin: 120px auto 0;
+  padding: 0 20px;
+}
+
+.confirmation-progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #2563eb;
+  transition: width 0.3s ease;
+  border-radius: 10px;
+}
+
+.confirmation-progress-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.progress-step {
+  flex: 1;
+  text-align: center;
+}
+
+.progress-step span {
+  font-size: 14px;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.progress-step.completed span,
+.progress-step.active span {
+  color: #2563eb;
+}
+
+/* Success Content */
+.confirmation-success-content {
+  max-width: 900px;
+  margin: 60px auto;
+  padding: 40px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.confirmation-ballot-icon {
+  margin-bottom: 40px;
+  animation: fadeInScale 0.6s ease-out;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.confirmation-success-title {
+  font-size: 32px;
+  font-weight: 800;
+  color: #1f2937;
+  margin: 0 0 16px 0;
+  letter-spacing: 0.5px;
+  animation: fadeInUp 0.6s ease-out 0.2s both;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.confirmation-success-message {
+  font-size: 16px;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.6;
+  animation: fadeInUp 0.6s ease-out 0.4s both;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .confirmation-progress-container {
+    margin-top: 60px;
+  }
+
+  .progress-step span {
+    font-size: 12px;
+  }
+
+  .confirmation-success-content {
+    margin: 40px auto;
+    padding: 20px;
+  }
+
+  .confirmation-ballot-icon svg {
+    width: 150px;
+    height: 150px;
+  }
+
+  .confirmation-success-title {
+    font-size: 24px;
+  }
+
+  .confirmation-success-message {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .confirmation-ballot-icon svg {
+    width: 120px;
+    height: 120px;
+  }
+
+  .confirmation-success-title {
+    font-size: 20px;
+  }
+}

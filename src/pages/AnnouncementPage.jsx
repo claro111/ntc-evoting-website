@@ -1,14 +1,64 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import FloatingCountdownTimer from '../components/FloatingCountdownTimer';
+import FloatingBottomNavbar from '../components/FloatingBottomNavbar';
+import Logo from '../components/Logo';
+import './AnnouncementPage.css';
 
 const AnnouncementPage = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [election, setElection] = useState(null);
+  const [votingStatus, setVotingStatus] = useState('closed');
 
   useEffect(() => {
+    // Set up real-time listener for elections
+    const electionsRef = collection(db, 'elections');
+    const activeElectionQuery = query(
+      electionsRef,
+      where('status', 'in', ['active', 'draft'])
+    );
+
+    const unsubscribeElection = onSnapshot(
+      activeElectionQuery,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const electionData = {
+            id: snapshot.docs[0].id,
+            ...snapshot.docs[0].data(),
+          };
+
+          setElection(electionData);
+
+          // Determine voting status
+          const now = new Date();
+          const startTime = electionData.startTime?.toDate();
+          const endTime = electionData.endTime?.toDate();
+
+          if (electionData.status === 'active' && startTime && endTime) {
+            if (now >= startTime && now <= endTime) {
+              setVotingStatus('active');
+            } else if (now < startTime) {
+              setVotingStatus('upcoming');
+            } else {
+              setVotingStatus('closed');
+            }
+          } else {
+            setVotingStatus('closed');
+          }
+        } else {
+          setElection(null);
+          setVotingStatus('closed');
+        }
+      },
+      (err) => {
+        console.error('Error fetching election data:', err);
+      }
+    );
+
     // Set up real-time listener for announcements
     const announcementsRef = collection(db, 'announcements');
     const announcementsQuery = query(
@@ -17,7 +67,7 @@ const AnnouncementPage = () => {
       orderBy('createdAt', 'desc')
     );
     
-    const unsubscribe = onSnapshot(
+    const unsubscribeAnnouncements = onSnapshot(
       announcementsQuery,
       (snapshot) => {
         const announcementsData = snapshot.docs.map(doc => ({
@@ -36,9 +86,24 @@ const AnnouncementPage = () => {
       }
     );
 
-    // Cleanup listener on unmount
-    return () => unsubscribe();
+    // Cleanup listeners on unmount
+    return () => {
+      unsubscribeElection();
+      unsubscribeAnnouncements();
+    };
   }, []);
+
+  const getTargetDate = () => {
+    if (!election) return null;
+    
+    if (votingStatus === 'upcoming' && election.startTime) {
+      return election.startTime.toDate();
+    } else if (votingStatus === 'active' && election.endTime) {
+      return election.endTime.toDate();
+    }
+    
+    return null;
+  };
 
   const handleAnnouncementClick = (announcement) => {
     setSelectedAnnouncement(announcement);
@@ -81,63 +146,60 @@ const AnnouncementPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto p-6">
+    <div className="announcement-page">
+      {/* Logo */}
+      <Logo />
+      
+      {/* Floating Countdown Timer */}
+      <FloatingCountdownTimer targetDate={getTargetDate()} votingStatus={votingStatus} />
+
+      {/* Main Content */}
+      <div className="announcement-content">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">Announcements</h1>
-          <p className="text-gray-600 mt-2">Stay updated with the latest voting system news</p>
+        <div className="announcement-header">
+          <h1 className="announcement-title">Announcements</h1>
         </div>
 
         {/* Announcements List */}
-        {announcements.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {loading ? (
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p className="loading-text">Loading announcements...</p>
+          </div>
+        ) : error ? (
+          <div className="error-container">
+            <p className="error-text">{error}</p>
+          </div>
+        ) : announcements.length === 0 ? (
+          <div className="empty-state">
+            <svg className="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
             </svg>
-            <p className="text-gray-600 text-lg">No current announcements</p>
-            <p className="text-gray-500 text-sm mt-2">Check back later for updates</p>
+            <p className="empty-text">No current announcements</p>
+            <p className="empty-subtext">Check back later for updates</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="announcements-list">
             {announcements.map((announcement) => (
               <div
                 key={announcement.id}
-                className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                className="announcement-card"
                 onClick={() => handleAnnouncementClick(announcement)}
               >
-                <div className="p-6">
-                  <div className="flex items-start gap-4">
-                    {/* Icon */}
-                    <div className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                        <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                        </svg>
-                      </div>
-                    </div>
+                {/* Icon */}
+                <div className="announcement-icon">
+                  🔔
+                </div>
 
-                    {/* Content */}
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                        {announcement.title}
-                      </h3>
-                      <div 
-                        className="text-gray-600 line-clamp-2"
-                        dangerouslySetInnerHTML={{ __html: announcement.description }}
-                      />
-                      <p className="text-sm text-gray-500 mt-3">
-                        {formatDate(announcement.createdAt)}
-                      </p>
-                    </div>
-
-                    {/* Arrow */}
-                    <div className="flex-shrink-0">
-                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
+                {/* Content */}
+                <div className="announcement-card-content">
+                  <h3 className="announcement-card-title">
+                    {announcement.title}
+                  </h3>
+                  <div 
+                    className="announcement-card-description"
+                    dangerouslySetInnerHTML={{ __html: announcement.description }}
+                  />
                 </div>
               </div>
             ))}
@@ -147,47 +209,41 @@ const AnnouncementPage = () => {
 
       {/* Announcement Detail Modal */}
       {selectedAnnouncement && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              {/* Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-800">
-                      {selectedAnnouncement.title}
-                    </h2>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {formatDate(selectedAnnouncement.createdAt)}
-                    </p>
-                  </div>
-                </div>
+        <div className="announcement-modal-overlay" onClick={handleClose}>
+          <div className="announcement-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="announcement-modal-header">
+              <div className="announcement-modal-icon">🔔</div>
+              <div className="announcement-modal-title-section">
+                <h2 className="announcement-modal-title">
+                  {selectedAnnouncement.title}
+                </h2>
+                <p className="announcement-modal-date">
+                  {formatDate(selectedAnnouncement.createdAt)}
+                </p>
               </div>
+            </div>
 
-              {/* Content */}
-              <div 
-                className="prose max-w-none text-gray-700 mb-6"
-                dangerouslySetInnerHTML={{ __html: selectedAnnouncement.description }}
-              />
+            {/* Content */}
+            <div 
+              className="announcement-modal-content"
+              dangerouslySetInnerHTML={{ __html: selectedAnnouncement.description }}
+            />
 
-              {/* Close Button */}
-              <div className="flex justify-end">
-                <button
-                  onClick={handleClose}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-                >
-                  CLOSE
-                </button>
-              </div>
+            {/* Close Button */}
+            <div className="announcement-modal-footer">
+              <button
+                onClick={handleClose}
+                className="announcement-modal-close-btn"
+              >
+                CLOSE
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Floating Bottom Navbar */}
+      <FloatingBottomNavbar />
     </div>
   );
 };
