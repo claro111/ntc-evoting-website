@@ -91,27 +91,103 @@
 }
 
 /* Responsive design */
+@media (max-width: 1024px) {
+  .voter-homepage {
+    padding-top: 90px;
+    padding-bottom: 160px;
+  }
+
+  .results-title {
+    font-size: 20px;
+  }
+
+  .winners-carousel-title {
+    font-size: 24px;
+  }
+}
+
 @media (max-width: 768px) {
   .voter-homepage {
     padding-top: 100px;
-    /* Smaller countdown timer on mobile */
     padding-bottom: 140px;
-    /* Increased space for navbar on mobile */
   }
 
   .position-title {
-    font-size: 20px;
-    padding: 0 16px;
+    font-size: 18px;
+    padding: 0 12px;
   }
 
   .homepage-content {
-    padding: 0 16px;
+    padding: 0;
+  }
+
+  .results-header {
+    padding: 5px 12px 0px;
+  }
+
+  .results-title {
+    font-size: 18px;
+  }
+
+  .winners-carousel-title {
+    font-size: 22px;
+    margin-bottom: 20px;
+  }
+
+  .winners-carousel-section {
+    padding: 20px 12px 50px;
   }
 }
 
 @media (max-width: 480px) {
+  .voter-homepage {
+    padding-top: 110px;
+    padding-bottom: 130px;
+  }
+
   .position-title {
+    font-size: 16px;
+    padding: 0 8px;
+  }
+
+  .results-header {
+    padding: 5px 8px 0px;
+  }
+
+  .results-title {
+    font-size: 16px;
+  }
+
+  .winners-carousel-title {
     font-size: 18px;
+    margin-bottom: 16px;
+  }
+
+  .winners-carousel-section {
+    padding: 16px 8px 40px;
+  }
+
+  .loading-text {
+    font-size: 14px;
+  }
+
+  .empty-state p {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 375px) {
+  .voter-homepage {
+    padding-top: 120px;
+    padding-bottom: 120px;
+  }
+
+  .results-title {
+    font-size: 14px;
+  }
+
+  .winners-carousel-title {
+    font-size: 16px;
   }
 }
 

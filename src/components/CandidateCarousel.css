@@ -378,30 +378,66 @@
 }
 
 /* Responsive design */
-@media (max-width: 768px) {
-  .candidate-carousel-container {
-    padding: 24px 0;
-  }
-
-  .candidate-swiper {
-    padding: 0 40px 50px;
-  }
-
+@media (max-width: 1024px) {
   .candidate-swiper .swiper-slide {
-    width: 300px;
+    width: 340px;
   }
 
   .carousel-candidate-card {
-    padding: 20px;
-    max-width: 300px;
+    max-width: 340px;
+  }
+
+  .candidate-swiper .swiper-slide:has(.winner-card) {
+    width: 260px;
+  }
+
+  .carousel-candidate-card.winner-card {
+    max-width: 260px;
+  }
+}
+
+@media (max-width: 768px) {
+  .candidate-carousel-container {
+    padding: 20px 0 16px;
+    margin-top: -10px;
+  }
+
+  .candidate-swiper {
+    padding: 0 20px 90px;
+  }
+
+  .candidate-swiper .swiper-slide {
+    width: 280px;
+  }
+
+  .carousel-candidate-card {
+    padding: 16px;
+    max-width: 280px;
+  }
+
+  .candidate-swiper .swiper-slide:has(.winner-card) {
+    width: 240px;
+  }
+
+  .carousel-candidate-card.winner-card {
+    padding: 12px;
+    max-width: 240px;
   }
 
   .candidate-photo-container {
-    max-width: 220px;
+    max-width: 240px;
+  }
+
+  .carousel-candidate-card.winner-card .candidate-photo-container {
+    max-width: 200px;
   }
 
   .candidate-name {
-    font-size: 28px !important;
+    font-size: 18px !important;
+  }
+
+  .carousel-candidate-card.winner-card .candidate-name {
+    font-size: 15px !important;
   }
 
   .candidate-swiper .swiper-button-next,
@@ -413,5 +449,122 @@
   .candidate-swiper .swiper-button-next:after,
   .candidate-swiper .swiper-button-prev:after {
     font-size: 16px;
+  }
+
+  .candidate-swiper .swiper-pagination {
+    bottom: 40px;
+  }
+
+  .carousel-candidate-card.winner-card[data-rank="1"]::before,
+  .carousel-candidate-card.winner-card[data-rank="2"]::before,
+  .carousel-candidate-card.winner-card[data-rank="3"]::before {
+    font-size: 28px;
+    top: -12px;
+    right: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .candidate-carousel-container {
+    padding: 16px 0 12px;
+  }
+
+  .candidate-swiper {
+    padding: 0 10px 80px;
+  }
+
+  .candidate-swiper .swiper-slide {
+    width: 240px;
+  }
+
+  .carousel-candidate-card {
+    padding: 14px;
+    max-width: 240px;
+  }
+
+  .candidate-swiper .swiper-slide:has(.winner-card) {
+    width: 200px;
+  }
+
+  .carousel-candidate-card.winner-card {
+    padding: 10px;
+    max-width: 200px;
+  }
+
+  .candidate-photo-container {
+    max-width: 200px;
+  }
+
+  .carousel-candidate-card.winner-card .candidate-photo-container {
+    max-width: 170px;
+  }
+
+  .candidate-name {
+    font-size: 16px !important;
+  }
+
+  .carousel-candidate-card.winner-card .candidate-name {
+    font-size: 14px !important;
+  }
+
+  .candidate-position-label {
+    font-size: 10px;
+    padding: 4px 10px;
+  }
+
+  .see-more-button {
+    padding: 8px 16px;
+    font-size: 12px;
+  }
+
+  .candidate-swiper .swiper-button-next,
+  .candidate-swiper .swiper-button-prev {
+    width: 28px;
+    height: 28px;
+  }
+
+  .candidate-swiper .swiper-button-next:after,
+  .candidate-swiper .swiper-button-prev:after {
+    font-size: 14px;
+  }
+
+  .candidate-swiper .swiper-pagination {
+    bottom: 35px;
+  }
+
+  .candidate-swiper .swiper-pagination-bullet {
+    width: 10px;
+    height: 10px;
+    margin: 0 4px;
+  }
+
+  .candidate-swiper .swiper-pagination-bullet-active {
+    width: 24px;
+  }
+
+  .carousel-candidate-card.winner-card[data-rank="1"]::before,
+  .carousel-candidate-card.winner-card[data-rank="2"]::before,
+  .carousel-candidate-card.winner-card[data-rank="3"]::before {
+    font-size: 24px;
+    top: -10px;
+    right: 12px;
+  }
+}
+
+@media (max-width: 375px) {
+  .candidate-swiper .swiper-slide {
+    width: 220px;
+  }
+
+  .carousel-candidate-card {
+    max-width: 220px;
+  }
+
+  .candidate-swiper .swiper-slide:has(.winner-card) {
+    width: 180px;
+  }
+
+  .carousel-candidate-card.winner-card {
+    max-width: 180px;
   }
 }

@@ -58,9 +58,29 @@
   border-bottom: none;
   margin-top: 30px;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  display: flex;
-  justify-content: center;
+  display: block;
+  width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db #f3f4f6;
+}
+
+.voting-position-tabs-container::-webkit-scrollbar {
+  height: 4px;
+}
+
+.voting-position-tabs-container::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+.voting-position-tabs-container::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
+}
+
+.voting-position-tabs-container::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
 
 .voting-position-tabs {
@@ -71,6 +91,8 @@
   gap: 0;
   border-bottom: 2px solid #e5e7eb;
   width: fit-content;
+  min-width: 100%;
+  justify-content: center;
 }
 
 .voting-position-tab {
@@ -596,13 +618,67 @@
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .voting-progress-container {
-    margin-top: 60px;
+    margin-top: 100px;
+    padding: 0 16px;
+  }
+
+  .voting-position-tabs-container {
+    justify-content: flex-start;
+  }
+
+  .voting-position-tabs {
+    padding: 0 16px;
+    justify-content: flex-start;
+    min-width: auto;
+  }
+
+  .voting-position-tab {
+    padding: 14px 20px;
+    font-size: 13px;
+  }
+
+  .voting-content {
+    padding: 0 16px 20px;
+  }
+
+  .position-title {
+    font-size: 24px;
+  }
+
+  .voting-btn-review {
+    min-width: 350px;
+  }
+}
+
+@media (max-width: 768px) {
+  .voting-page {
+    padding-bottom: 200px;
+  }
+
+  .voting-progress-container {
+    margin-top: 80px;
+    padding: 0 12px;
+  }
+
+  .voting-progress-bar {
+    height: 6px;
   }
 
   .progress-step span {
-    font-size: 12px;
+    font-size: 11px;
+  }
+
+  .voting-position-tabs-container {
+    margin-top: 20px;
+    justify-content: flex-start;
+  }
+
+  .voting-position-tabs {
+    padding: 0 12px;
+    justify-content: flex-start;
+    min-width: auto;
   }
 
   .voting-position-tab {
@@ -610,12 +686,31 @@
     font-size: 12px;
   }
 
+  .voting-content {
+    margin: 20px auto;
+    padding: 0 12px 20px;
+  }
+
   .voting-position-section {
     padding: 16px;
+    margin-bottom: 20px;
   }
 
   .position-title {
-    font-size: 22px;
+    font-size: 20px;
+  }
+
+  .position-selected {
+    font-size: 12px;
+  }
+
+  .position-badge {
+    padding: 6px 16px;
+    font-size: 12px;
+  }
+
+  .voting-candidates-heading {
+    font-size: 14px;
   }
 
   .voting-candidate-card {
@@ -626,6 +721,10 @@
   .voting-candidate-avatar {
     width: 50px;
     height: 50px;
+  }
+
+  .voting-avatar-placeholder {
+    font-size: 20px;
   }
 
   .voting-candidate-info h4 {
@@ -642,36 +741,270 @@
     font-size: 12px;
   }
 
+  .voting-review-button-container {
+    bottom: 90px;
+    padding: 0 12px;
+  }
+
   .voting-btn-review {
     padding: 14px 32px;
     font-size: 14px;
-    min-width: 300px;
+    min-width: 280px;
+  }
+
+  .vote-count-badge {
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
   }
 
   .voting-modal-content {
     max-width: 95%;
   }
 
+  .voting-modal-header {
+    padding: 32px 20px 20px;
+  }
+
   .voting-modal-header h2 {
     font-size: 20px;
+  }
+
+  .voting-modal-position {
+    font-size: 14px;
   }
 
   .voting-modal-avatar {
     width: 80px;
     height: 80px;
   }
+
+  .voting-modal-avatar .voting-avatar-placeholder {
+    font-size: 32px;
+  }
+
+  .voting-modal-body {
+    padding: 20px;
+  }
+
+  .voting-modal-section h3 {
+    font-size: 16px;
+  }
+
+  .voting-modal-text {
+    font-size: 14px;
+  }
+
+  .voting-modal-footer {
+    padding: 16px 20px;
+  }
+
+  .voting-btn-modal-vote {
+    padding: 14px;
+    font-size: 14px;
+  }
 }
 
 @media (max-width: 480px) {
-  .voting-candidate-actions {
+  .voting-page {
+    padding-bottom: 180px;
+  }
+
+  .voting-progress-container {
+    margin-top: 70px;
+    padding: 0 8px;
+  }
+
+  .progress-step span {
+    font-size: 10px;
+  }
+
+  .voting-position-tabs-container {
+    margin-top: 16px;
+    justify-content: flex-start;
+  }
+
+  .voting-position-tabs {
+    padding: 0 8px;
+    justify-content: flex-start;
+    min-width: auto;
+  }
+
+  .voting-position-tab {
+    padding: 10px 12px;
+    font-size: 11px;
+  }
+
+  .voting-content {
+    margin: 16px auto;
+    padding: 0 8px 16px;
+  }
+
+  .voting-position-section {
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+
+  .voting-position-header {
     flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .position-title {
+    font-size: 18px;
+  }
+
+  .position-selected {
+    font-size: 11px;
+  }
+
+  .position-badge {
+    padding: 6px 14px;
+    font-size: 11px;
+  }
+
+  .voting-candidates-heading {
+    font-size: 13px;
+  }
+
+  .voting-candidate-card {
+    padding: 10px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .voting-candidate-avatar {
+    width: 45px;
+    height: 45px;
+    border: 2px solid white;
+  }
+
+  .voting-avatar-placeholder {
+    font-size: 18px;
+  }
+
+  .voting-candidate-info {
+    flex: 1;
+    min-width: 150px;
+  }
+
+  .voting-candidate-info h4 {
+    font-size: 14px;
+  }
+
+  .voting-candidate-info p {
+    font-size: 12px;
+  }
+
+  .voting-candidate-actions {
+    flex-direction: row;
     gap: 6px;
+    width: 100%;
   }
 
   .voting-btn-view,
   .voting-btn-vote {
-    width: 100%;
+    flex: 1;
     padding: 8px 12px;
+    font-size: 11px;
+  }
+
+  .voting-review-button-container {
+    bottom: 80px;
+    padding: 0 8px;
+  }
+
+  .voting-btn-review {
+    padding: 12px 24px;
+    font-size: 13px;
+    min-width: 240px;
+  }
+
+  .vote-count-badge {
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+    margin-left: 6px;
+  }
+
+  .voting-modal-header {
+    padding: 28px 16px 16px;
+  }
+
+  .voting-modal-header h2 {
+    font-size: 18px;
+  }
+
+  .voting-modal-position {
+    font-size: 13px;
+  }
+
+  .voting-modal-avatar {
+    width: 70px;
+    height: 70px;
+  }
+
+  .voting-modal-avatar .voting-avatar-placeholder {
+    font-size: 28px;
+  }
+
+  .voting-modal-body {
+    padding: 16px;
+  }
+
+  .voting-modal-section h3 {
+    font-size: 15px;
+  }
+
+  .voting-modal-text {
+    font-size: 13px;
+  }
+
+  .voting-modal-footer {
+    padding: 14px 16px;
+  }
+
+  .voting-btn-modal-vote {
+    padding: 12px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 375px) {
+  .voting-progress-container {
+    margin-top: 65px;
+  }
+
+  .progress-step span {
+    font-size: 9px;
+  }
+
+  .voting-position-tabs-container {
+    justify-content: flex-start;
+  }
+
+  .voting-position-tabs {
+    justify-content: flex-start;
+    min-width: auto;
+  }
+
+  .voting-position-tab {
+    padding: 8px 10px;
+    font-size: 10px;
+  }
+
+  .position-title {
+    font-size: 16px;
+  }
+
+  .voting-candidate-info h4 {
+    font-size: 13px;
+  }
+
+  .voting-btn-review {
+    min-width: 200px;
+    padding: 10px 20px;
+    font-size: 12px;
   }
 }
 
