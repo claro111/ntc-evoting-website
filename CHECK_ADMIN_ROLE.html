@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check Admin Role</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f7fa;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 { color: #1e3a5f; }
+    button {
+      background: #1e3a5f;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+    button:hover { background: #2c5282; }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      background: #f9fafb;
+      border-left: 4px solid #1e3a5f;
+    }
+    .success { background: #d1fae5; border-left-color: #10b981; }
+    .error { background: #fee2e2; border-left-color: #ef4444; }
+    pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Check Admin Role</h1>
+    <p>This tool helps you check if your admin account has the correct role set.</p>
+    
+    <button onclick="checkRole()">Check My Role</button>
+    <button onclick="listAllAdmins()">List All Admins</button>
+    
+    <div id="result"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+    import { getAuth } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+    import { getFirestore, collection, getDocs, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDxP8OKeam4rWvDwehGvo8vjSl15s0onfA",
+      authDomain: "ntc-evoting-website.firebaseapp.com",
+      projectId: "ntc-evoting-website",
+      storageBucket: "ntc-evoting-website.firebasestorage.app",
+      messagingSenderId: "1045454245972",
+      appId: "1:1045454245972:web:f5043498e0a965004f1dc1"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    window.checkRole = async function() {
+      const resultDiv = document.getElementById('result');
+      const user = auth.currentUser;
+
+      if (!user) {
+        resultDiv.className = 'result error';
+        resultDiv.innerHTML = '<strong>❌ Not Logged In</strong><p>Please login to your admin panel first, then come back to this page.</p>';
+        return;
+      }
+
+      try {
+        resultDiv.className = 'result';
+        resultDiv.innerHTML = '<p>Checking...</p>';
+
+        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+
+        if (!adminDoc.exists()) {
+          resultDiv.className = 'result error';
+          resultDiv.innerHTML = `
+            <strong>❌ Admin Document Not Found</strong>
+            <p><strong>User ID:</strong> ${user.uid}</p>
+            <p><strong>Email:</strong> ${user.email}</p>
+            <p>No document found in the 'admins' collection with this User ID.</p>
+            <p><strong>Solution:</strong> Create a document in Firestore with ID: <code>${user.uid}</code></p>
+          `;
+          return;
+        }
+
+        const data = adminDoc.data();
+        const hasRole = data.role !== undefined;
+
+        if (hasRole && data.role === 'superadmin') {
+          resultDiv.className = 'result success';
+          resultDiv.innerHTML = `
+            <strong>✅ Superadmin Role Found!</strong>
+            <p><strong>User ID:</strong> ${user.uid}</p>
+            <p><strong>Email:</strong> ${data.email || user.email}</p>
+            <p><strong>Name:</strong> ${data.name || 'Not set'}</p>
+            <p><strong>Role:</strong> ${data.role}</p>
+            <p><strong>Permissions:</strong> ${data.permissions?.length || 0} permissions</p>
+            <p>✅ The "Add New Admin" button should be visible!</p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+        } else if (hasRole) {
+          resultDiv.className = 'result';
+          resultDiv.innerHTML = `
+            <strong>⚠️ Role Found (Not Superadmin)</strong>
+            <p><strong>User ID:</strong> ${user.uid}</p>
+            <p><strong>Email:</strong> ${data.email || user.email}</p>
+            <p><strong>Name:</strong> ${data.name || 'Not set'}</p>
+            <p><strong>Role:</strong> ${data.role}</p>
+            <p>❌ You need "superadmin" role to see the "Add New Admin" button.</p>
+            <p><strong>Solution:</strong> Change the role field to "superadmin" in Firestore.</p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+        } else {
+          resultDiv.className = 'result error';
+          resultDiv.innerHTML = `
+            <strong>❌ Role Field Missing</strong>
+            <p><strong>User ID:</strong> ${user.uid}</p>
+            <p><strong>Email:</strong> ${data.email || user.email}</p>
+            <p>The admin document exists but has no 'role' field.</p>
+            <p><strong>Solution:</strong> Add field "role" with value "superadmin" in Firestore.</p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+        }
+      } catch (error) {
+        resultDiv.className = 'result error';
+        resultDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+        console.error(error);
+      }
+    };
+
+    window.listAllAdmins = async function() {
+      const resultDiv = document.getElementById('result');
+
+      try {
+        resultDiv.className = 'result';
+        resultDiv.innerHTML = '<p>Loading all admins...</p>';
+
+        const adminsSnapshot = await getDocs(collection(db, 'admins'));
+
+        if (adminsSnapshot.empty) {
+          resultDiv.className = 'result error';
+          resultDiv.innerHTML = '<strong>❌ No Admins Found</strong><p>The "admins" collection is empty.</p>';
+          return;
+        }
+
+        let html = '<strong>📋 All Admin Accounts:</strong><br><br>';
+        
+        adminsSnapshot.forEach(doc => {
+          const data = doc.data();
+          const isCurrent = auth.currentUser && doc.id === auth.currentUser.uid;
+          html += `
+            <div style="background: ${isCurrent ? '#fef3c7' : '#f9fafb'}; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid ${data.role === 'superadmin' ? '#dc2626' : '#2563eb'};">
+              ${isCurrent ? '<strong>👤 YOU</strong><br>' : ''}
+              <strong>Email:</strong> ${data.email || 'Not set'}<br>
+              <strong>Name:</strong> ${data.name || 'Not set'}<br>
+              <strong>Role:</strong> ${data.role || '❌ NOT SET'}<br>
+              <strong>User ID:</strong> ${doc.id}<br>
+              <strong>Permissions:</strong> ${data.permissions?.length || 0}
+            </div>
+          `;
+        });
+
+        resultDiv.className = 'result success';
+        resultDiv.innerHTML = html;
+      } catch (error) {
+        resultDiv.className = 'result error';
+        resultDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+        console.error(error);
+      }
+    };
+  </script>
+</body>
+</html>

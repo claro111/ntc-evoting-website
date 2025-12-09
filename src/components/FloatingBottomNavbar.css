@@ -24,6 +24,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   padding: 12px 28px;
   background: none;
   border: none;
@@ -39,6 +40,18 @@
 
 .nav-item.active {
   background: #08479D;
+}
+
+.nav-icon {
+  width: 24px;
+  height: 24px;
+  color: #6b7280;
+  transition: color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.nav-item:hover .nav-icon {
+  color: #3b82f6;
 }
 
 .nav-item.active .nav-icon {
@@ -108,8 +121,13 @@
     padding: 10px 20px;
   }
 
+  .nav-icon {
+    width: 22px;
+    height: 22px;
+  }
+
   .nav-label {
-    font-size: 12px;
+    display: none;
   }
 }
 
@@ -125,12 +143,17 @@
   }
 
   .nav-item {
-    padding: 8px 16px;
+    padding: 10px 14px;
     min-width: auto;
   }
 
+  .nav-icon {
+    width: 20px;
+    height: 20px;
+  }
+
   .nav-label {
-    font-size: 11px;
+    display: none;
   }
 }
 
@@ -145,11 +168,16 @@
   }
 
   .nav-item {
-    padding: 6px 12px;
+    padding: 8px 12px;
+  }
+
+  .nav-icon {
+    width: 20px;
+    height: 20px;
   }
 
   .nav-label {
-    font-size: 10px;
+    display: none;
   }
 }
 
@@ -158,5 +186,51 @@
   .nav-item {
     min-height: 44px;
     min-width: 44px;
+  }
+}
+
+/* Notification Badge */
+.nav-item {
+  position: relative;
+}
+
+.notification-badge {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  background: #ef4444;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.nav-item.active .notification-badge {
+  background: #dc2626;
+}
+
+@media (max-width: 768px) {
+  .notification-badge {
+    top: 2px;
+    right: 4px;
+    font-size: 9px;
+    width: 16px;
+    height: 16px;
   }
 }

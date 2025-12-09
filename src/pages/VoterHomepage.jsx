@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { db, auth } from '../config/firebase';
 import FloatingCountdownTimer from '../components/FloatingCountdownTimer';
 import PositionTabs from '../components/PositionTabs';
 import CandidateCarousel from '../components/CandidateCarousel';
@@ -23,25 +23,41 @@ const VoterHomepage = () => {
   const [error, setError] = useState(null);
   const [winners, setWinners] = useState([]);
   const [resultsPublished, setResultsPublished] = useState(false);
+  const [voterSchool, setVoterSchool] = useState('');
+
+  useEffect(() => {
+    // Fetch voter's school
+    const fetchVoterSchool = async () => {
+      const user = auth.currentUser;
+      if (user) {
+        try {
+          const voterRef = doc(db, 'voters', user.uid);
+          const voterDoc = await getDoc(voterRef);
+          if (voterDoc.exists()) {
+            setVoterSchool(voterDoc.data().school || '');
+          }
+        } catch (error) {
+          console.error('Error fetching voter school:', error);
+        }
+      }
+    };
+
+    fetchVoterSchool();
+  }, []);
 
   useEffect(() => {
     console.log('VoterHomepage: Setting up real-time listeners');
 
-    // Set up real-time listener for elections
-    const electionsRef = collection(db, 'elections');
-    // Query for current election (can be active, closed, or draft)
-    const activeElectionQuery = query(
-      electionsRef,
-      where('status', 'in', ['active', 'closed', 'draft'])
-    );
+    // Set up real-time listener for the current election document
+    const electionRef = doc(db, 'elections', 'current');
 
     const unsubscribeElection = onSnapshot(
-      activeElectionQuery,
-      (snapshot) => {
-        if (!snapshot.empty) {
+      electionRef,
+      (electionDoc) => {
+        if (electionDoc.exists()) {
           const electionData = {
-            id: snapshot.docs[0].id,
-            ...snapshot.docs[0].data(),
+            id: electionDoc.id,
+            ...electionDoc.data(),
           };
 
           setElection(electionData);
@@ -69,6 +85,7 @@ const VoterHomepage = () => {
         } else {
           setElection(null);
           setVotingStatus('closed');
+          setResultsPublished(false);
         }
 
         setLoading(false);
@@ -163,11 +180,22 @@ const VoterHomepage = () => {
     if (!selectedPosition) {
       return [];
     }
-    const positionCandidates = candidates.filter((c) => c.position === selectedPosition);
+    let positionCandidates = candidates.filter((c) => c.position === selectedPosition);
     
-    // If results are published, sort by vote count and return top 3 with winner flag
+    // Filter Representatives by voter's school
+    if (selectedPosition === 'Representatives' && voterSchool) {
+      positionCandidates = positionCandidates.filter((c) => c.school === voterSchool);
+    }
+    
+    // If results are published, sort by manual winner first, then vote count, and return top 3 with winner flag
     if (resultsPublished) {
-      const sorted = [...positionCandidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+      const sorted = [...positionCandidates].sort((a, b) => {
+        // If one candidate is manually selected as winner, they should be ranked first
+        if (a.manuallySelectedWinner && !b.manuallySelectedWinner) return -1;
+        if (!a.manuallySelectedWinner && b.manuallySelectedWinner) return 1;
+        // Otherwise sort by vote count
+        return (b.voteCount || 0) - (a.voteCount || 0);
+      });
       const top3 = sorted.slice(0, 3).map((candidate, index) => ({
         ...candidate,
         isWinner: true,

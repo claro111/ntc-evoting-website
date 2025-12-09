@@ -16,10 +16,12 @@ import AdminLoginPage from './pages/AdminLoginPage';
 import AdminForgotPasswordPage from './pages/AdminForgotPasswordPage';
 import AdminLayout from './components/AdminLayout';
 import AdminDashboard from './pages/AdminDashboard';
+import ArchiveResultsPage from './pages/ArchiveResultsPage';
 import ManageVotersPage from './pages/ManageVotersPage';
 import ManageCandidatesPage from './pages/ManageCandidatesPage';
 import VotingControlPage from './pages/VotingControlPage';
 import ManageAnnouncementsPage from './pages/ManageAnnouncementsPage';
+import ManageAdminsPage from './pages/ManageAdminsPage';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import ProtectedVoterRoute from './components/ProtectedVoterRoute';
 
@@ -55,10 +57,12 @@ function App() {
           {/* Admin App Routes with Layout */}
           <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>
             <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="archive" element={<ArchiveResultsPage />} />
             <Route path="manage-voters" element={<ManageVotersPage />} />
             <Route path="manage-candidates" element={<ManageCandidatesPage />} />
             <Route path="voting-control" element={<VotingControlPage />} />
             <Route path="announcements" element={<ManageAnnouncementsPage />} />
+            <Route path="manage-admins" element={<ManageAdminsPage />} />
           </Route>
           
           {/* 404 Route */}

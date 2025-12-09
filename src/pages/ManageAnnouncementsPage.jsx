@@ -3,6 +3,10 @@ import { collection, query, addDoc, updateDoc, deleteDoc, doc, Timestamp, orderB
 import { db } from '../config/firebase';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useToast } from '../hooks/useToast';
+import { useConfirm } from '../hooks/useConfirm';
 import './ManageAnnouncementsPage.css';
 
 const ManageAnnouncementsPage = () => {
@@ -12,6 +16,8 @@ const ManageAnnouncementsPage = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const { toast, showToast, hideToast } = useToast();
+  const { confirmState, showConfirm } = useConfirm();
 
   useEffect(() => {
     // Set up real-time listener for announcements
@@ -47,12 +53,12 @@ const ManageAnnouncementsPage = () => {
   const handlePostAnnouncement = async () => {
     // Validate
     if (!title.trim()) {
-      alert('Please enter an announcement title');
+      showToast('Please enter an announcement title', 'warning');
       return;
     }
 
     if (!description.trim() || description === '<p><br></p>') {
-      alert('Please enter an announcement description');
+      showToast('Please enter an announcement description', 'warning');
       return;
     }
 
@@ -67,7 +73,7 @@ const ManageAnnouncementsPage = () => {
           description: description,
           updatedAt: Timestamp.now(),
         });
-        alert('Announcement updated successfully!');
+        showToast('Announcement updated successfully!', 'success');
       } else {
         // Create new announcement
         await addDoc(collection(db, 'announcements'), {
@@ -77,7 +83,7 @@ const ManageAnnouncementsPage = () => {
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
         });
-        alert('Announcement posted successfully!');
+        showToast('Announcement posted successfully!', 'success');
       }
 
       handleClearForm();
@@ -85,7 +91,7 @@ const ManageAnnouncementsPage = () => {
       setSubmitting(false);
     } catch (err) {
       console.error('Error posting announcement:', err);
-      alert('Failed to post announcement. Please try again.');
+      showToast('Failed to post announcement. Please try again.', 'error');
       setSubmitting(false);
     }
   };
@@ -98,17 +104,26 @@ const ManageAnnouncementsPage = () => {
   };
 
   const handleDeleteAnnouncement = async (announcementId) => {
-    if (!window.confirm('Are you sure you want to delete this announcement?')) {
+    const confirmed = await showConfirm({
+      title: 'Delete Announcement',
+      message: 'Are you sure you want to delete this announcement?',
+      warningText: 'This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+
+    if (!confirmed) {
       return;
     }
 
     try {
       await deleteDoc(doc(db, 'announcements', announcementId));
-      alert('Announcement deleted successfully!');
+      showToast('Announcement deleted successfully!', 'success');
       // No need to manually fetch - real-time listener will update automatically
     } catch (err) {
       console.error('Error deleting announcement:', err);
-      alert('Failed to delete announcement. Please try again.');
+      showToast('Failed to delete announcement. Please try again.', 'error');
     }
   };
 
@@ -237,8 +252,8 @@ const ManageAnnouncementsPage = () => {
             {announcements.map((announcement) => (
               <div key={announcement.id} className="announcement-card">
                 <div className="announcement-header">
-                  <h3 className="announcement-title">{announcement.title}</h3>
-                  <span className="announcement-date">{formatDate(announcement.createdAt)}</span>
+                  <h3 className="admin-announcement-title">{announcement.title}</h3>
+                  <span className="admin-announcement-date">{formatDate(announcement.createdAt)}</span>
                 </div>
                 
                 <div 
@@ -281,6 +296,29 @@ const ManageAnnouncementsPage = () => {
           </div>
         )}
       </div>
+
+      {/* Confirm Dialog */}
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          warningText={confirmState.warningText}
+          confirmText={confirmState.confirmText}
+          cancelText={confirmState.cancelText}
+          type={confirmState.type}
+          onConfirm={confirmState.onConfirm}
+          onCancel={confirmState.onCancel}
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={hideToast}
+        />
+      )}
     </div>
   );
 };

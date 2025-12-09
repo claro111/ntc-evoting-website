@@ -30,10 +30,10 @@
 }
 
 .section-title {
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #2d3748;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .section-title.danger {
@@ -193,12 +193,18 @@
 }
 
 .btn-close {
-  background-color: #ed8936;
-  color: white;
+  background-color: #ed8936 !important;
+  color: white !important;
 }
 
 .btn-close:hover:not(:disabled) {
-  background-color: #dd6b20;
+  background-color: #dd6b20 !important;
+}
+
+.btn-close:disabled {
+  background-color: #fed7aa !important;
+  color: #9c4221 !important;
+  cursor: not-allowed;
 }
 
 .btn-reset {

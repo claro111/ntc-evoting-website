@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { approveVoter, rejectVoter } from '../services/voterService';
+import Toast from '../components/Toast';
+import InputConfirmDialog from '../components/InputConfirmDialog';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useToast } from '../hooks/useToast';
+import { useInputConfirm } from '../hooks/useInputConfirm';
+import { useConfirm } from '../hooks/useConfirm';
 import './ManageVotersPage.css';
 
 const ManageVotersPage = () => {
@@ -20,6 +26,9 @@ const ManageVotersPage = () => {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const { toast, showToast, hideToast } = useToast();
+  const { confirmDialog, showInputConfirm } = useInputConfirm();
+  const { confirmState, showConfirm } = useConfirm();
 
   const handleReviewClick = (voter) => {
     setSelectedVoter(voter);
@@ -258,7 +267,10 @@ const ManageVotersPage = () => {
             className={`tab ${activeTab === 'pending' ? 'active' : ''}`}
             onClick={() => setActiveTab('pending')}
           >
-            Pending Reviews ({stats.pendingReviews})
+            Pending Reviews 
+            {stats.pendingReviews > 0 && (
+              <span className="tab-badge">{stats.pendingReviews}</span>
+            )}
           </button>
           <button
             className={`tab ${activeTab === 'registered' ? 'active' : ''}`}
@@ -296,6 +308,8 @@ const ManageVotersPage = () => {
           <DeactivatedVotersTab 
             voters={filterVoters(deactivatedVoters)} 
             formatDate={formatDate}
+            showToast={showToast}
+            showConfirm={showConfirm}
           />
         )}
       </div>
@@ -306,6 +320,8 @@ const ManageVotersPage = () => {
           voter={selectedVoter}
           onClose={handleCloseModal}
           onSuccess={handleApproveReject}
+          showToast={showToast}
+          showInputConfirm={showInputConfirm}
         />
       )}
 
@@ -315,6 +331,7 @@ const ManageVotersPage = () => {
           voter={selectedVoter}
           onClose={handleCloseEditModal}
           onSuccess={handleEditSuccess}
+          showToast={showToast}
         />
       )}
 
@@ -324,6 +341,45 @@ const ManageVotersPage = () => {
           voter={selectedVoter}
           onClose={handleCloseDeleteModal}
           onSuccess={handleDeleteSuccess}
+          showToast={showToast}
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={hideToast}
+        />
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          warningText={confirmState.warningText}
+          confirmText={confirmState.confirmText}
+          cancelText={confirmState.cancelText}
+          type={confirmState.type}
+          onConfirm={confirmState.onConfirm}
+          onCancel={confirmState.onCancel}
+        />
+      )}
+
+      {/* Input Confirm Dialog */}
+      {confirmDialog && (
+        <InputConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          subtitle={confirmDialog.subtitle}
+          warningItems={confirmDialog.warningItems}
+          confirmWord={confirmDialog.confirmWord}
+          placeholder={confirmDialog.placeholder}
+          confirmButtonText={confirmDialog.confirmButtonText}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={confirmDialog.onCancel}
         />
       )}
     </div>
@@ -467,14 +523,25 @@ const RegisteredVotersTab = ({ voters, formatDate, onEditClick, onDeleteClick })
 };
 
 // Deactivated Voters Tab Component
-const DeactivatedVotersTab = ({ voters, formatDate }) => {
+const DeactivatedVotersTab = ({ voters, formatDate, showToast, showConfirm }) => {
   const [reactivating, setReactivating] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedVoter, setSelectedVoter] = useState(null);
 
   const handleReactivate = async (voter) => {
-    if (!window.confirm(`Are you sure you want to reactivate ${voter.fullName}?`)) {
+    const confirmed = await showConfirm({
+      title: 'Reactivate Voter',
+      message: `Are you sure you want to reactivate ${voter.fullName}?`,
+      warningText: voter.emailVerified 
+        ? 'The voter will be restored to registered status and can log in again.'
+        : 'The voter will be moved back to Pending Reviews for approval.',
+      confirmText: 'Reactivate',
+      cancelText: 'Cancel',
+      type: 'info'
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -492,12 +559,12 @@ const DeactivatedVotersTab = ({ voters, formatDate }) => {
       // If voter was rejected before email verification, send them back to pending
       if (!voter.emailVerified) {
         updateData.status = 'pending';
-        alert('Voter has been moved back to Pending Reviews. Please review and approve again.');
+        showToast('Voter has been moved back to Pending Reviews. Please review and approve again.', 'info');
       } else {
         // If voter was previously verified, reactivate as registered
         updateData.status = 'registered';
         updateData.emailVerified = true;
-        alert('Voter has been reactivated successfully!');
+        showToast('Voter has been reactivated successfully!', 'success');
       }
 
       await updateDoc(voterRef, updateData);
@@ -505,7 +572,7 @@ const DeactivatedVotersTab = ({ voters, formatDate }) => {
       // No need to reload - real-time listeners will update automatically
     } catch (err) {
       console.error('Error reactivating voter:', err);
-      alert('Failed to reactivate voter. Please try again.');
+      showToast('Failed to reactivate voter. Please try again.', 'error');
       setReactivating(null);
     }
   };
@@ -524,14 +591,14 @@ const DeactivatedVotersTab = ({ voters, formatDate }) => {
       const voterRef = doc(db, 'voters', selectedVoter.id);
       await deleteDoc(voterRef);
       
-      alert(`${selectedVoter.fullName} has been permanently deleted from the system.`);
+      showToast(`${selectedVoter.fullName} has been permanently deleted from the system.`, 'success');
       setShowDeleteModal(false);
       setSelectedVoter(null);
       
       // No need to refresh - real-time listeners will update automatically
     } catch (err) {
       console.error('Error permanently deleting voter:', err);
-      alert('Failed to permanently delete voter. Please try again.');
+      showToast('Failed to permanently delete voter. Please try again.', 'error');
       setDeleting(null);
     }
   };
@@ -679,7 +746,7 @@ const DeactivatedVotersTab = ({ voters, formatDate }) => {
 };
 
 // Review Registration Modal Component
-const ReviewRegistrationModal = ({ voter, onClose, onSuccess }) => {
+const ReviewRegistrationModal = ({ voter, onClose, onSuccess, showToast, showInputConfirm }) => {
   const [expirationDate, setExpirationDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -704,13 +771,26 @@ const ReviewRegistrationModal = ({ voter, onClose, onSuccess }) => {
     if (voter.verificationDocumentUrl) {
       window.open(voter.verificationDocumentUrl, '_blank');
     } else {
-      alert('No verification document available');
+      showToast('No verification document available', 'warning');
     }
   };
 
   const handleApprove = async () => {
     if (!expirationDate) {
       setError('Please select an expiration date');
+      return;
+    }
+
+    // Validate that expiration date is in the future (at least tomorrow)
+    const selectedDate = new Date(expirationDate);
+    selectedDate.setHours(0, 0, 0, 0); // Reset time to start of day
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
+    
+    if (selectedDate <= today) {
+      setError('Expiration date must be in the future. Please select a date from tomorrow onwards.');
+      showToast('Expiration date must be at least tomorrow', 'error');
       return;
     }
 
@@ -721,7 +801,7 @@ const ReviewRegistrationModal = ({ voter, onClose, onSuccess }) => {
       // Call Cloud Function to approve voter
       const result = await approveVoter(voter.id, expirationDate);
       
-      alert(result.message || 'Voter approved successfully! Verification email has been sent.');
+      showToast(result.message || 'Voter approved successfully! Verification email has been sent.', 'success');
       onSuccess();
     } catch (err) {
       console.error('Error approving voter:', err);
@@ -731,9 +811,22 @@ const ReviewRegistrationModal = ({ voter, onClose, onSuccess }) => {
   };
 
   const handleReject = async () => {
-    const reason = prompt('Enter rejection reason (optional):');
-    
-    if (!window.confirm('Are you sure you want to reject this registration?')) {
+    const reason = await showInputConfirm({
+      title: 'Reject Registration',
+      message: 'Are you sure you want to reject this voter registration?',
+      subtitle: voter.fullName,
+      warningItems: [
+        'The voter will be moved to deactivated status',
+        'They will not be able to log in',
+        'A rejection notification email will be sent',
+        'This action can be reversed by reactivating the voter'
+      ],
+      confirmWord: 'REJECT',
+      placeholder: 'REJECT',
+      confirmButtonText: 'Reject Registration'
+    });
+
+    if (!reason) {
       return;
     }
 
@@ -742,9 +835,9 @@ const ReviewRegistrationModal = ({ voter, onClose, onSuccess }) => {
       setError('');
 
       // Call Cloud Function to reject voter
-      const result = await rejectVoter(voter.id, reason);
+      const result = await rejectVoter(voter.id, '');
       
-      alert(result.message || 'Voter registration rejected. Notification email has been sent.');
+      showToast(result.message || 'Voter registration rejected. Notification email has been sent.', 'success');
       onSuccess();
     } catch (err) {
       console.error('Error rejecting voter:', err);
@@ -861,7 +954,7 @@ const ReviewRegistrationModal = ({ voter, onClose, onSuccess }) => {
 };
 
 // Edit Voter Modal Component
-const EditVoterModal = ({ voter, onClose, onSuccess }) => {
+const EditVoterModal = ({ voter, onClose, onSuccess, showToast }) => {
   const [formData, setFormData] = useState({
     fullName: voter.fullName || '',
     studentId: voter.studentId || '',
@@ -896,7 +989,7 @@ const EditVoterModal = ({ voter, onClose, onSuccess }) => {
         updatedAt: Timestamp.now(),
       });
 
-      alert('Voter information updated successfully!');
+      showToast('Voter information updated successfully!', 'success');
       onSuccess();
     } catch (err) {
       console.error('Error updating voter:', err);
@@ -924,7 +1017,7 @@ const EditVoterModal = ({ voter, onClose, onSuccess }) => {
         updatedAt: Timestamp.now(),
       });
 
-      alert('Voter has been deactivated successfully.');
+      showToast('Voter has been deactivated successfully.', 'success');
       onSuccess();
     } catch (err) {
       console.error('Error deactivating voter:', err);
@@ -1070,7 +1163,7 @@ const EditVoterModal = ({ voter, onClose, onSuccess }) => {
 };
 
 // Delete Voter Modal Component
-const DeleteVoterModal = ({ voter, onClose, onSuccess }) => {
+const DeleteVoterModal = ({ voter, onClose, onSuccess, showToast }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [confirmText, setConfirmText] = useState('');
@@ -1094,7 +1187,7 @@ const DeleteVoterModal = ({ voter, onClose, onSuccess }) => {
         updatedAt: Timestamp.now(),
       });
 
-      alert('Voter has been deactivated successfully.');
+      showToast('Voter has been deactivated successfully.', 'success');
       onSuccess();
     } catch (err) {
       console.error('Error deleting voter:', err);

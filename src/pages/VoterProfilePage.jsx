@@ -25,10 +25,26 @@ const VoterProfilePage = () => {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
+  const [positions, setPositions] = useState([]);
 
   useEffect(() => {
     fetchVoterProfile();
+    fetchPositions();
   }, []);
+
+  const fetchPositions = async () => {
+    try {
+      const positionsRef = collection(db, 'positions');
+      const positionsSnapshot = await getDocs(positionsRef);
+      const positionsData = positionsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setPositions(positionsData.sort((a, b) => (a.order || 0) - (b.order || 0)));
+    } catch (error) {
+      console.error('Error fetching positions:', error);
+    }
+  };
 
   useEffect(() => {
     // Set up real-time listener for active election
@@ -111,8 +127,9 @@ const VoterProfilePage = () => {
   };
 
   const groupByPosition = () => {
-    if (!receipt || !receipt.candidates) return {};
+    if (!receipt || !receipt.candidates) return [];
 
+    // Group candidates by position
     const grouped = {};
     receipt.candidates.forEach((candidate) => {
       const positionName = candidate.positionName || 'Unknown Position';
@@ -121,7 +138,21 @@ const VoterProfilePage = () => {
       }
       grouped[positionName].push(candidate);
     });
-    return grouped;
+
+    // Convert to array and sort by position order
+    const groupedArray = Object.entries(grouped).map(([positionName, candidates]) => {
+      const position = positions.find(p => p.name === positionName);
+      return {
+        positionName,
+        candidates,
+        order: position?.order || 999 // Put unknown positions at the end
+      };
+    });
+
+    // Sort by position order
+    groupedArray.sort((a, b) => a.order - b.order);
+
+    return groupedArray;
   };
 
   const handleChangePassword = () => {
@@ -439,7 +470,7 @@ const VoterProfilePage = () => {
             <div className="receipt-votes-section">
               <h2 className="receipt-section-title">Your Votes</h2>
               <div className="receipt-votes-list">
-                {Object.entries(groupByPosition()).map(([positionName, candidates]) => (
+                {groupByPosition().map(({ positionName, candidates }) => (
                   <div key={positionName} className="receipt-vote-card">
                     <h3 className="receipt-position-name">{positionName}</h3>
                     {candidates.map((candidate, index) => (

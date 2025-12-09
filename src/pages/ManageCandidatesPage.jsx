@@ -4,6 +4,10 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useToast } from '../hooks/useToast';
+import { useConfirm } from '../hooks/useConfirm';
 import './ManageCandidatesPage.css';
 
 const ManageCandidatesPage = () => {
@@ -13,6 +17,8 @@ const ManageCandidatesPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const { toast, showToast, hideToast } = useToast();
+  const { confirmState, showConfirm } = useConfirm();
   const [showPositionModal, setShowPositionModal] = useState(false);
   const [showCandidateModal, setShowCandidateModal] = useState(false);
   const [positionFilter, setPositionFilter] = useState('all');
@@ -86,8 +92,10 @@ const ManageCandidatesPage = () => {
         { name: 'Treasurer', maxSelection: 1, order: 4 },
         { name: 'Auditor', maxSelection: 1, order: 5 },
         { name: 'Senator', maxSelection: 5, order: 6 },
+        { name: 'Representatives', maxSelection: 3, order: 7 },
       ];
 
+      // Add positions
       for (const position of samplePositions) {
         await addDoc(collection(db, 'positions'), {
           ...position,
@@ -95,11 +103,80 @@ const ManageCandidatesPage = () => {
         });
       }
 
-      alert('Sample data loaded successfully!');
+      // Sample candidate names
+      const firstNames = ['John', 'Jane', 'Michael', 'Sarah', 'David', 'Emily', 'Robert', 'Lisa', 'James', 'Maria'];
+      const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez'];
+      const schools = ['SOB', 'SOTE', 'SOAST', 'SOCJ'];
+
+      // Add 10 candidates for each position
+      for (const position of samplePositions) {
+        for (let i = 0; i < 10; i++) {
+          const candidateName = `${firstNames[i]} ${lastNames[i]}`;
+          const candidateData = {
+            name: candidateName,
+            position: position.name,
+            bio: `<p>${candidateName} is a dedicated candidate for ${position.name}. With years of experience in leadership and community service, they are committed to serving with integrity and excellence.</p>`,
+            platform: `<p><strong>Key Goals:</strong></p><ul><li>Promote transparency and accountability</li><li>Foster inclusive community engagement</li><li>Drive positive organizational change</li></ul>`,
+            photoUrl: '',
+            createdAt: Timestamp.now(),
+          };
+
+          // Add school for Representatives position
+          if (position.name === 'Representatives') {
+            const schoolIndex = Math.floor(i / 2.5); // Distribute 10 candidates across 4 schools
+            candidateData.school = schools[schoolIndex];
+            candidateData.bio = `<p>${candidateName} is a dedicated candidate for ${position.name} from ${schools[schoolIndex]}. With years of experience in leadership and community service, they are committed to serving with integrity and excellence.</p>`;
+          } else {
+            candidateData.school = '';
+          }
+
+          await addDoc(collection(db, 'candidates'), candidateData);
+        }
+      }
+
+      showToast('Sample data loaded successfully! Added 7 positions and 70 candidates.', 'success');
       await fetchData();
     } catch (err) {
       console.error('Error loading sample data:', err);
-      alert('Failed to load sample data');
+      showToast('Failed to load sample data', 'error');
+    }
+  };
+
+  const handleResetData = async () => {
+    const confirmMessage = 'WARNING: This will permanently delete ALL positions and candidates. This action cannot be undone. Are you sure?';
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    // Double confirmation for safety
+    if (!window.confirm('Are you ABSOLUTELY sure? All data will be lost!')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Delete all candidates
+      const candidatesSnapshot = await getDocs(collection(db, 'candidates'));
+      const candidateDeletePromises = candidatesSnapshot.docs.map((doc) =>
+        deleteDoc(doc.ref)
+      );
+      await Promise.all(candidateDeletePromises);
+
+      // Delete all positions
+      const positionsSnapshot = await getDocs(collection(db, 'positions'));
+      const positionDeletePromises = positionsSnapshot.docs.map((doc) =>
+        deleteDoc(doc.ref)
+      );
+      await Promise.all(positionDeletePromises);
+
+      showToast('All positions and candidates have been deleted successfully!', 'success');
+      await fetchData();
+    } catch (err) {
+      console.error('Error resetting data:', err);
+      showToast('Failed to reset data. Please try again.', 'error');
+      setLoading(false);
     }
   };
 
@@ -119,7 +196,27 @@ const ManageCandidatesPage = () => {
       grouped[candidate.position].push(candidate);
     });
 
-    return grouped;
+    // Sort positions by their order field
+    const sortedGrouped = {};
+    const sortedPositions = positions
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .map(p => p.name);
+    
+    // Add positions in sorted order
+    sortedPositions.forEach(positionName => {
+      if (grouped[positionName]) {
+        sortedGrouped[positionName] = grouped[positionName];
+      }
+    });
+    
+    // Add any remaining positions that weren't in the positions array
+    Object.keys(grouped).forEach(positionName => {
+      if (!sortedGrouped[positionName]) {
+        sortedGrouped[positionName] = grouped[positionName];
+      }
+    });
+
+    return sortedGrouped;
   };
 
   if (loading) {
@@ -139,9 +236,14 @@ const ManageCandidatesPage = () => {
           <h1 className="page-title">Manage Candidates</h1>
           <p className="page-subtitle">Manage election positions and candidates</p>
         </div>
-        <button className="btn-load-sample" onClick={handleLoadSampleData}>
-          Load Sample Data
-        </button>
+        <div className="header-buttons">
+          <button className="btn-load-sample" onClick={handleLoadSampleData}>
+            Load Sample Data
+          </button>
+          <button className="btn-reset-candidates" onClick={handleResetData}>
+            Reset All Data
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -170,6 +272,8 @@ const ManageCandidatesPage = () => {
             onAdd={handleAddPosition}
             onEdit={handleEditPosition}
             onRefresh={fetchData}
+            showToast={showToast}
+            showConfirm={showConfirm}
           />
         )}
         {activeTab === 'candidates' && (
@@ -181,6 +285,8 @@ const ManageCandidatesPage = () => {
             onAdd={handleAddCandidate}
             onEdit={handleEditCandidate}
             onRefresh={fetchData}
+            showToast={showToast}
+            showConfirm={showConfirm}
           />
         )}
       </div>
@@ -194,6 +300,7 @@ const ManageCandidatesPage = () => {
             setShowPositionModal(false);
             fetchData();
           }}
+          showToast={showToast}
         />
       )}
 
@@ -207,6 +314,30 @@ const ManageCandidatesPage = () => {
             setShowCandidateModal(false);
             fetchData();
           }}
+          showToast={showToast}
+        />
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          warningText={confirmState.warningText}
+          confirmText={confirmState.confirmText}
+          cancelText={confirmState.cancelText}
+          type={confirmState.type}
+          onConfirm={confirmState.onConfirm}
+          onCancel={confirmState.onCancel}
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={hideToast}
         />
       )}
     </div>
@@ -214,19 +345,28 @@ const ManageCandidatesPage = () => {
 };
 
 // Positions Tab Component
-const PositionsTab = ({ positions, onAdd, onEdit, onRefresh }) => {
+const PositionsTab = ({ positions, onAdd, onEdit, onRefresh, showToast, showConfirm }) => {
   const handleDelete = async (position) => {
-    if (!window.confirm(`Delete position "${position.name}"? This cannot be undone.`)) {
+    const confirmed = await showConfirm({
+      title: 'Delete Position',
+      message: `Are you sure you want to delete position "${position.name}"?`,
+      warningText: 'This action cannot be undone. All candidates under this position will remain but may need reassignment.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+
+    if (!confirmed) {
       return;
     }
 
     try {
       await deleteDoc(doc(db, 'positions', position.id));
-      alert('Position deleted successfully');
+      showToast('Position deleted successfully', 'success');
       onRefresh();
     } catch (err) {
       console.error('Error deleting position:', err);
-      alert('Failed to delete position');
+      showToast('Failed to delete position', 'error');
     }
   };
 
@@ -269,19 +409,28 @@ const PositionsTab = ({ positions, onAdd, onEdit, onRefresh }) => {
 };
 
 // Candidates Tab Component
-const CandidatesTab = ({ candidates, positions, positionFilter, onFilterChange, onAdd, onEdit, onRefresh }) => {
+const CandidatesTab = ({ candidates, positions, positionFilter, onFilterChange, onAdd, onEdit, onRefresh, showToast, showConfirm }) => {
   const handleDelete = async (candidate) => {
-    if (!window.confirm(`Delete candidate "${candidate.name}"? This cannot be undone.`)) {
+    const confirmed = await showConfirm({
+      title: 'Delete Candidate',
+      message: `Are you sure you want to delete candidate "${candidate.name}"?`,
+      warningText: 'This action cannot be undone. All votes for this candidate will be preserved in the records.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+
+    if (!confirmed) {
       return;
     }
 
     try {
       await deleteDoc(doc(db, 'candidates', candidate.id));
-      alert('Candidate deleted successfully');
+      showToast('Candidate deleted successfully', 'success');
       onRefresh();
     } catch (err) {
       console.error('Error deleting candidate:', err);
-      alert('Failed to delete candidate');
+      showToast('Failed to delete candidate', 'error');
     }
   };
 
@@ -356,7 +505,7 @@ const CandidatesTab = ({ candidates, positions, positionFilter, onFilterChange, 
 };
 
 // Position Form Modal Component
-const PositionFormModal = ({ position, onClose, onSuccess }) => {
+const PositionFormModal = ({ position, onClose, onSuccess, showToast }) => {
   const [formData, setFormData] = useState({
     name: position?.name || '',
     maxSelection: position?.maxSelection || 1,
@@ -383,7 +532,7 @@ const PositionFormModal = ({ position, onClose, onSuccess }) => {
           maxSelection: parseInt(formData.maxSelection),
           updatedAt: Timestamp.now(),
         });
-        alert('Position updated successfully');
+        showToast('Position updated successfully', 'success');
       } else {
         // Create new position
         await addDoc(collection(db, 'positions'), {
@@ -391,7 +540,7 @@ const PositionFormModal = ({ position, onClose, onSuccess }) => {
           maxSelection: parseInt(formData.maxSelection),
           createdAt: Timestamp.now(),
         });
-        alert('Position created successfully');
+        showToast('Position created successfully', 'success');
       }
 
       onSuccess();
@@ -457,10 +606,11 @@ const PositionFormModal = ({ position, onClose, onSuccess }) => {
 };
 
 // Candidate Form Modal Component
-const CandidateFormModal = ({ candidate, positions, onClose, onSuccess }) => {
+const CandidateFormModal = ({ candidate, positions, onClose, onSuccess, showToast }) => {
   const [formData, setFormData] = useState({
     name: candidate?.name || '',
     position: candidate?.position || '',
+    school: candidate?.school || '',
     bio: candidate?.bio || '<p><br></p>',
     platform: candidate?.platform || '<p><br></p>',
   });
@@ -485,7 +635,7 @@ const CandidateFormModal = ({ candidate, positions, onClose, onSuccess }) => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB');
+        showToast('File size must be less than 5MB', 'warning');
         return;
       }
       setPhotoFile(file);
@@ -511,6 +661,7 @@ const CandidateFormModal = ({ candidate, positions, onClose, onSuccess }) => {
       const candidateData = {
         name: formData.name,
         position: formData.position,
+        school: formData.school || '',
         bio: formData.bio,
         platform: formData.platform,
         photoUrl: photoUrl,
@@ -522,14 +673,14 @@ const CandidateFormModal = ({ candidate, positions, onClose, onSuccess }) => {
           ...candidateData,
           updatedAt: Timestamp.now(),
         });
-        alert('Candidate updated successfully');
+        showToast('Candidate updated successfully', 'success');
       } else {
         // Create new candidate
         await addDoc(collection(db, 'candidates'), {
           ...candidateData,
           createdAt: Timestamp.now(),
         });
-        alert('Candidate created successfully');
+        showToast('Candidate created successfully', 'success');
       }
 
       onSuccess();
@@ -580,6 +731,27 @@ const CandidateFormModal = ({ candidate, positions, onClose, onSuccess }) => {
                 ))}
               </select>
             </div>
+
+            {/* School field - only for Representatives */}
+            {formData.position === 'Representatives' && (
+              <div className="form-group">
+                <label className="form-label">School:</label>
+                <select
+                  name="school"
+                  className="form-input"
+                  value={formData.school}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">Select School</option>
+                  <option value="SOB">School of Business (SOB)</option>
+                  <option value="SOTE">School of Teacher Education (SOTE)</option>
+                  <option value="SOAST">School of Arts, Sciences and Technology (SOAST)</option>
+                  <option value="SOCJ">School of Criminal Justice (SOCJ)</option>
+                </select>
+                <p className="form-hint">Representatives are school-specific</p>
+              </div>
+            )}
 
             <div className="form-group">
               <label className="form-label">Full Bio:</label>

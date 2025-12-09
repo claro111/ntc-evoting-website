@@ -20,13 +20,13 @@
 .admin-sidebar-logo {
   padding: 24px 20px;
   text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .admin-logo-image {
-  width: 60px;
-  height: 60px;
+  width: 80px;
+  height: 80px;
   margin: 0 auto 12px;
+  object-fit: contain;
 }
 
 .admin-logo-text {
@@ -62,27 +62,27 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: color 0.2s;
   display: flex;
   align-items: center;
   gap: 0;
 }
 
 .admin-nav-button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: transparent !important;
+  color: #FFDF2B !important;
 }
 
 .admin-nav-button.active {
-  background: rgba(251, 191, 36, 0.2);
-  color: #fbbf24;
-  border-left: 4px solid #fbbf24;
+  background: transparent;
+  color: #FFDF2B;
+  border-left: 4px solid #FFDF2B;
   padding-left: 16px;
 }
 
 /* Logout Section */
 .admin-sidebar-footer {
   padding: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .admin-logout-button {
@@ -95,14 +95,15 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: color 0.2s;
   display: flex;
   align-items: center;
   gap: 0;
 }
 
 .admin-logout-button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: transparent !important;
+  color: #FFDF2B !important;
 }
 
 /* Main Content */
@@ -111,4 +112,41 @@
   overflow-y: auto;
   height: 100%;
   width: 100%;
+}
+
+/* Admin Badge for Pending Items */
+.admin-nav-button {
+  position: relative;
+}
+
+.admin-badge {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  background: #ef4444;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    transform: translateY(-50%) scale(1);
+  }
+  50% {
+    transform: translateY(-50%) scale(1.1);
+  }
+}
+
+.admin-nav-button.active .admin-badge {
+  background: #dc2626;
 }

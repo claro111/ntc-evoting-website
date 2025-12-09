@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Update Admin Role</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f7fa;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #1e3a5f;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #64748b;
+      margin-bottom: 30px;
+    }
+    .section {
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #f9fafb;
+      border-radius: 8px;
+      border-left: 4px solid #1e3a5f;
+    }
+    .section h3 {
+      color: #1e3a5f;
+      margin-top: 0;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    button {
+      background: #1e3a5f;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s;
+    }
+    button:hover {
+      background: #2c5282;
+    }
+    button:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      display: none;
+    }
+    .result.success {
+      background: #d1fae5;
+      color: #065f46;
+      border-left: 4px solid #10b981;
+      display: block;
+    }
+    .result.error {
+      background: #fee2e2;
+      color: #991b1b;
+      border-left: 4px solid #ef4444;
+      display: block;
+    }
+    .result.info {
+      background: #dbeafe;
+      color: #1e40af;
+      border-left: 4px solid #3b82f6;
+      display: block;
+    }
+    .admin-info {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+    }
+    .admin-info p {
+      margin: 8px 0;
+    }
+    .admin-info strong {
+      color: #1e3a5f;
+    }
+    .warning {
+      background: #fef3c7;
+      color: #92400e;
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #f59e0b;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔧 Update Admin Role</h1>
+    <p class="subtitle">Add or update the role field for your admin account</p>
+
+    <div class="warning">
+      ⚠️ <strong>Important:</strong> You must be logged in as an admin to use this tool. This will update your admin document in Firestore to include the role field.
+    </div>
+
+    <!-- Step 1: Login -->
+    <div class="section">
+      <h3>Step 1: Login as Admin</h3>
+      <input type="email" id="email" placeholder="Admin Email" />
+      <input type="password" id="password" placeholder="Admin Password" />
+      <button onclick="loginAdmin()">Login</button>
+      <div id="loginResult" class="result"></div>
+    </div>
+
+    <!-- Step 2: Check Current Status -->
+    <div class="section">
+      <h3>Step 2: Check Current Admin Status</h3>
+      <button onclick="checkAdminStatus()" id="checkBtn" disabled>Check My Admin Status</button>
+      <div id="statusResult" class="result"></div>
+    </div>
+
+    <!-- Step 3: Update Role -->
+    <div class="section">
+      <h3>Step 3: Update Role</h3>
+      <select id="role">
+        <option value="superadmin">Super Admin (Full Access)</option>
+        <option value="moderator">Moderator (Limited Access)</option>
+      </select>
+      <button onclick="updateRole()" id="updateBtn" disabled>Update My Role</button>
+      <div id="updateResult" class="result"></div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+    import { getFirestore, doc, getDoc, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+    // Your Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDxP8OKeam4rWvDwehGvo8vjSl15s0onfA",
+      authDomain: "ntc-evoting-website.firebaseapp.com",
+      projectId: "ntc-evoting-website",
+      storageBucket: "ntc-evoting-website.firebasestorage.app",
+      messagingSenderId: "1045454245972",
+      appId: "1:1045454245972:web:f5043498e0a965004f1dc1"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+
+    // Make functions global
+    window.loginAdmin = async function() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const resultDiv = document.getElementById('loginResult');
+
+      if (!email || !password) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = 'Please enter both email and password';
+        return;
+      }
+
+      try {
+        resultDiv.className = 'result info';
+        resultDiv.textContent = 'Logging in...';
+
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        currentUser = userCredential.user;
+
+        resultDiv.className = 'result success';
+        resultDiv.textContent = `✓ Logged in successfully as ${email}`;
+
+        document.getElementById('checkBtn').disabled = false;
+        document.getElementById('updateBtn').disabled = false;
+
+        // Auto-check status
+        setTimeout(() => checkAdminStatus(), 500);
+      } catch (error) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = `Login failed: ${error.message}`;
+        console.error(error);
+      }
+    };
+
+    window.checkAdminStatus = async function() {
+      const resultDiv = document.getElementById('statusResult');
+
+      if (!currentUser) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = 'Please login first';
+        return;
+      }
+
+      try {
+        resultDiv.className = 'result info';
+        resultDiv.textContent = 'Checking admin status...';
+
+        const adminDoc = await getDoc(doc(db, 'admins', currentUser.uid));
+
+        if (!adminDoc.exists()) {
+          resultDiv.className = 'result error';
+          resultDiv.innerHTML = `
+            <strong>❌ Admin Document Not Found</strong>
+            <div class="admin-info">
+              <p><strong>User ID:</strong> ${currentUser.uid}</p>
+              <p><strong>Email:</strong> ${currentUser.email}</p>
+              <p>You need to create an admin document in Firestore first.</p>
+              <p>Go to Firebase Console → Firestore → Create 'admins' collection → Add document with ID: ${currentUser.uid}</p>
+            </div>
+          `;
+          return;
+        }
+
+        const adminData = adminDoc.data();
+        const hasRole = adminData.role !== undefined;
+
+        if (hasRole) {
+          resultDiv.className = 'result success';
+          resultDiv.innerHTML = `
+            <strong>✓ Admin Document Found</strong>
+            <div class="admin-info">
+              <p><strong>User ID:</strong> ${currentUser.uid}</p>
+              <p><strong>Email:</strong> ${adminData.email || currentUser.email}</p>
+              <p><strong>Name:</strong> ${adminData.name || 'Not set'}</p>
+              <p><strong>Current Role:</strong> ${adminData.role}</p>
+              <p><strong>Permissions:</strong> ${adminData.permissions?.length || 0} permissions</p>
+            </div>
+          `;
+        } else {
+          resultDiv.className = 'result error';
+          resultDiv.innerHTML = `
+            <strong>⚠️ Role Field Missing</strong>
+            <div class="admin-info">
+              <p><strong>User ID:</strong> ${currentUser.uid}</p>
+              <p><strong>Email:</strong> ${adminData.email || currentUser.email}</p>
+              <p><strong>Name:</strong> ${adminData.name || 'Not set'}</p>
+              <p><strong>Issue:</strong> The 'role' field is missing from your admin document.</p>
+              <p>Use Step 3 below to add it.</p>
+            </div>
+          `;
+        }
+      } catch (error) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = `Error: ${error.message}`;
+        console.error(error);
+      }
+    };
+
+    window.updateRole = async function() {
+      const role = document.getElementById('role').value;
+      const resultDiv = document.getElementById('updateResult');
+
+      if (!currentUser) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = 'Please login first';
+        return;
+      }
+
+      try {
+        resultDiv.className = 'result info';
+        resultDiv.textContent = 'Updating role...';
+
+        const adminRef = doc(db, 'admins', currentUser.uid);
+        const adminDoc = await getDoc(adminRef);
+
+        const defaultPermissions = role === 'superadmin' 
+          ? ['Approve Voters', 'View Dashboard', 'Export Reports', 'Edit Admins', 'Delete Voters', 'View Candidates', 'Reset Votes', 'View Announcements']
+          : ['View Dashboard', 'View Results', 'View Candidates', 'View Announcements'];
+
+        if (!adminDoc.exists()) {
+          // Create new admin document
+          await setDoc(adminRef, {
+            email: currentUser.email,
+            name: currentUser.displayName || 'Admin',
+            role: role,
+            permissions: defaultPermissions,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            mfaEnabled: false
+          });
+        } else {
+          // Update existing admin document
+          await updateDoc(adminRef, {
+            role: role,
+            permissions: defaultPermissions,
+            updatedAt: new Date()
+          });
+        }
+
+        resultDiv.className = 'result success';
+        resultDiv.innerHTML = `
+          <strong>✓ Role Updated Successfully!</strong>
+          <div class="admin-info">
+            <p><strong>New Role:</strong> ${role === 'superadmin' ? 'Super Admin' : 'Moderator'}</p>
+            <p><strong>Permissions:</strong> ${defaultPermissions.length} permissions assigned</p>
+            <p>You can now access the Manage Admins page!</p>
+            <p><strong>Next Step:</strong> Refresh your admin panel and navigate to "Manage Admins"</p>
+          </div>
+        `;
+
+        // Refresh status
+        setTimeout(() => checkAdminStatus(), 1000);
+      } catch (error) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = `Error: ${error.message}`;
+        console.error(error);
+      }
+    };
+  </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import Logo from '../components/Logo';
 import FloatingBottomNavbar from '../components/FloatingBottomNavbar';
@@ -12,6 +12,7 @@ const VotingPage = () => {
   const [candidates, setCandidates] = useState([]);
   const [positions, setPositions] = useState([]);
   const [selectedVotes, setSelectedVotes] = useState({});
+  const [abstainedPositions, setAbstainedPositions] = useState({});
   const [votingClosed, setVotingClosed] = useState(true);
   const [loading, setLoading] = useState(true);
   const [activePositionTab, setActivePositionTab] = useState(null);
@@ -20,9 +21,10 @@ const VotingPage = () => {
   const [election, setElection] = useState(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [resultsPublished, setResultsPublished] = useState(false);
+  const [voterSchool, setVoterSchool] = useState('');
 
   useEffect(() => {
-    // Check if user has already voted
+    // Check if user has already voted and get voter's school
     const checkVotingStatus = async () => {
       const user = auth.currentUser;
       if (user) {
@@ -30,7 +32,9 @@ const VotingPage = () => {
           const voterRef = doc(db, 'voters', user.uid);
           const voterDoc = await getDoc(voterRef);
           if (voterDoc.exists()) {
-            setHasVoted(voterDoc.data().hasVoted || false);
+            const voterData = voterDoc.data();
+            setHasVoted(voterData.hasVoted || false);
+            setVoterSchool(voterData.school || '');
           }
         } catch (error) {
           console.error('Error checking voting status:', error);
@@ -65,15 +69,14 @@ const VotingPage = () => {
       setLoading(false);
     });
 
-    // Set up real-time listener for election (active or closed)
-    const electionsRef = collection(db, 'elections');
-    const activeElectionQuery = query(electionsRef, where('status', 'in', ['active', 'closed']));
+    // Set up real-time listener for the current election document
+    const electionRef = doc(db, 'elections', 'current');
 
-    const unsubscribeElection = onSnapshot(activeElectionQuery, (electionSnapshot) => {
-      if (!electionSnapshot.empty) {
+    const unsubscribeElection = onSnapshot(electionRef, (electionDoc) => {
+      if (electionDoc.exists()) {
         const electionData = {
-          id: electionSnapshot.docs[0].id,
-          ...electionSnapshot.docs[0].data(),
+          id: electionDoc.id,
+          ...electionDoc.data(),
         };
 
         setElection(electionData);
@@ -86,7 +89,7 @@ const VotingPage = () => {
         const startTime = electionData.startTime?.toDate();
         const endTime = electionData.endTime?.toDate();
 
-        if (startTime && endTime && now >= startTime && now <= endTime) {
+        if (electionData.status === 'active' && startTime && endTime && now >= startTime && now <= endTime) {
           setVotingClosed(false);
         } else {
           setVotingClosed(true);
@@ -94,6 +97,7 @@ const VotingPage = () => {
       } else {
         setElection(null);
         setVotingClosed(true);
+        setResultsPublished(false);
       }
     });
 
@@ -110,14 +114,70 @@ const VotingPage = () => {
     setSelectedVotes((prev) => {
       const newVotes = { ...prev };
       const positionKey = candidate.position || candidate.positionName;
+      
+      // Clear abstain if voting for this position
+      setAbstainedPositions((prevAbstain) => {
+        const newAbstain = { ...prevAbstain };
+        delete newAbstain[positionKey];
+        return newAbstain;
+      });
+      
+      // Find the position to get maxSelection
+      const position = positions.find(p => p.name === positionKey);
+      const maxSelection = position?.maxSelection || 1;
 
-      if (newVotes[positionKey] === candidate.id) {
-        delete newVotes[positionKey];
+      if (maxSelection === 1) {
+        // Single selection - toggle behavior
+        if (newVotes[positionKey] === candidate.id) {
+          delete newVotes[positionKey];
+        } else {
+          newVotes[positionKey] = candidate.id;
+        }
       } else {
-        newVotes[positionKey] = candidate.id;
+        // Multiple selection - array behavior
+        const currentSelections = newVotes[positionKey] || [];
+        const candidateIndex = currentSelections.indexOf(candidate.id);
+
+        if (candidateIndex > -1) {
+          // Remove if already selected
+          const updatedSelections = currentSelections.filter(id => id !== candidate.id);
+          if (updatedSelections.length === 0) {
+            delete newVotes[positionKey];
+          } else {
+            newVotes[positionKey] = updatedSelections;
+          }
+        } else {
+          // Add if not at max
+          if (currentSelections.length < maxSelection) {
+            newVotes[positionKey] = [...currentSelections, candidate.id];
+          }
+        }
       }
 
       return newVotes;
+    });
+  };
+
+  const handleAbstain = (positionName) => {
+    if (votingClosed) return;
+
+    setAbstainedPositions((prev) => {
+      const newAbstain = { ...prev };
+      
+      if (newAbstain[positionName]) {
+        // Toggle off abstain
+        delete newAbstain[positionName];
+      } else {
+        // Set abstain and clear any votes for this position
+        newAbstain[positionName] = true;
+        setSelectedVotes((prevVotes) => {
+          const newVotes = { ...prevVotes };
+          delete newVotes[positionName];
+          return newVotes;
+        });
+      }
+      
+      return newAbstain;
     });
   };
 
@@ -132,18 +192,37 @@ const VotingPage = () => {
   };
 
   const handleProceedToReview = () => {
+    // Collect all selected candidate IDs from both single values and arrays
+    const selectedCandidateIds = [];
+    Object.values(selectedVotes).forEach(vote => {
+      if (Array.isArray(vote)) {
+        selectedCandidateIds.push(...vote);
+      } else {
+        selectedCandidateIds.push(vote);
+      }
+    });
+
     const selectedCandidates = candidates
-      .filter((c) => Object.values(selectedVotes).includes(c.id))
+      .filter((c) => selectedCandidateIds.includes(c.id))
       .map((candidate) => ({
         ...candidate,
         positionName: candidate.position || candidate.positionName,
       }));
+    
     sessionStorage.setItem('selectedVotes', JSON.stringify(selectedCandidates));
+    sessionStorage.setItem('abstainedPositions', JSON.stringify(abstainedPositions));
     navigate('/voter/review-vote');
   };
 
   const getCandidatesForPosition = (positionName) => {
-    return candidates.filter((c) => c.position === positionName);
+    let filteredCandidates = candidates.filter((c) => c.position === positionName);
+    
+    // Filter Representatives by voter's school
+    if (positionName === 'Representatives' && voterSchool) {
+      filteredCandidates = filteredCandidates.filter((c) => c.school === voterSchool);
+    }
+    
+    return filteredCandidates;
   };
 
   const getDisplayedPositions = () => {
@@ -261,7 +340,13 @@ const VotingPage = () => {
           <h2 className="results-title">Election Results</h2>
           {displayedPositions.map((position) => {
             const positionCandidates = getCandidatesForPosition(position.name)
-              .sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+              .sort((a, b) => {
+                // If one candidate is manually selected as winner, they should be ranked first
+                if (a.manuallySelectedWinner && !b.manuallySelectedWinner) return -1;
+                if (!a.manuallySelectedWinner && b.manuallySelectedWinner) return 1;
+                // Otherwise sort by vote count
+                return (b.voteCount || 0) - (a.voteCount || 0);
+              });
             const totalVotes = positionCandidates.reduce((sum, c) => sum + (c.voteCount || 0), 0);
             const winner = positionCandidates[0];
 
@@ -272,7 +357,7 @@ const VotingPage = () => {
                   {positionCandidates.map((candidate, index) => {
                     const voteCount = candidate.voteCount || 0;
                     const percentage = totalVotes > 0 ? ((voteCount / totalVotes) * 100).toFixed(1) : 0;
-                    const isWinner = candidate.id === winner?.id;
+                    const isWinner = candidate.manuallySelectedWinner || candidate.id === winner?.id;
 
                     return (
                       <div key={candidate.id} className={`results-candidate-card ${isWinner ? 'winner' : ''}`}>
@@ -310,8 +395,11 @@ const VotingPage = () => {
         <div className="voting-content">
           {displayedPositions.map((position) => {
             const positionCandidates = getCandidatesForPosition(position.name);
-            const selectedCount = selectedVotes[position.name] ? 1 : 0;
             const maxSelection = position.maxSelection || 1;
+            const positionVotes = selectedVotes[position.name];
+            const selectedCount = Array.isArray(positionVotes) ? positionVotes.length : (positionVotes ? 1 : 0);
+
+            const isAbstained = abstainedPositions[position.name];
 
             return (
               <div key={position.id} className="voting-position-section">
@@ -319,26 +407,48 @@ const VotingPage = () => {
               <div className="voting-position-header">
                 <div className="position-info">
                   <h2 className="position-title">{position.name}</h2>
-                  <p className="position-selected">{selectedCount} SELECTED</p>
+                  {position.name === 'Representatives' && voterSchool && (
+                    <p className="position-school-info">Showing candidates from your school: {voterSchool}</p>
+                  )}
+                  <p className="position-selected">
+                    {isAbstained ? 'ABSTAINED' : `${selectedCount} SELECTED`}
+                  </p>
                 </div>
                 <div className="position-badge">Select up to {maxSelection}</div>
               </div>
 
               {/* Candidates Heading */}
               <h3 className="voting-candidates-heading">
-                Choose your preferred candidate(s):
+                Choose your preferred candidate(s) or abstain:
               </h3>
               <p className="voting-position-label">{position.name.toUpperCase()}</p>
 
+              {/* Abstain Button */}
+              <div className="voting-abstain-container">
+                <button
+                  className={`voting-btn-abstain ${isAbstained ? 'abstained' : ''}`}
+                  onClick={() => handleAbstain(position.name)}
+                  disabled={votingClosed || hasVoted}
+                >
+                  {isAbstained ? '✓ ABSTAINED' : 'ABSTAIN FROM VOTING'}
+                </button>
+                {isAbstained && (
+                  <p className="abstain-note">You chose not to vote for this position</p>
+                )}
+              </div>
+
               {/* Candidates List */}
-              <div className="voting-candidates-list">
+              <div className={`voting-candidates-list ${isAbstained ? 'abstained' : ''}`}>
                 {positionCandidates.map((candidate) => {
-                  const isSelected = selectedVotes[position.name] === candidate.id;
+                  const positionVotes = selectedVotes[position.name];
+                  const isSelected = Array.isArray(positionVotes) 
+                    ? positionVotes.includes(candidate.id)
+                    : positionVotes === candidate.id;
 
                   return (
                     <div
                       key={candidate.id}
-                      className={`voting-candidate-card ${isSelected ? 'selected' : ''}`}
+                      className={`voting-candidate-card ${isSelected ? 'selected' : ''} ${isAbstained ? 'disabled' : ''}`}
                     >
                       <div className="voting-candidate-avatar">
                         {candidate.photoUrl ? (
@@ -351,7 +461,7 @@ const VotingPage = () => {
                       </div>
                       <div className="voting-candidate-info">
                         <h4>{candidate.name}</h4>
-                        <p>{position.name}</p>
+                        <p>{position.name}{candidate.school ? ` - ${candidate.school}` : ''}</p>
                       </div>
                       <div className="voting-candidate-actions">
                         <button
@@ -363,7 +473,7 @@ const VotingPage = () => {
                         <button
                           className="voting-btn-vote"
                           onClick={() => handleVoteSelection(candidate)}
-                          disabled={votingClosed || hasVoted}
+                          disabled={votingClosed || hasVoted || isAbstained}
                         >
                           {(votingClosed || hasVoted) ? 'VOTED' : (isSelected ? 'SELECTED' : 'VOTE')}
                         </button>
@@ -384,12 +494,25 @@ const VotingPage = () => {
           <button 
             className="voting-btn-review" 
             onClick={handleProceedToReview}
-            disabled={Object.keys(selectedVotes).length === 0}
+            disabled={Object.keys(selectedVotes).length === 0 && Object.keys(abstainedPositions).length === 0}
           >
             Review Selections
-            {Object.keys(selectedVotes).length > 0 && (
+            {(Object.keys(selectedVotes).length > 0 || Object.keys(abstainedPositions).length > 0) && (
               <span className="vote-count-badge">
-                {Object.keys(selectedVotes).length}
+                {(() => {
+                  // Count total selected candidates (handle both single values and arrays)
+                  let totalCount = 0;
+                  Object.values(selectedVotes).forEach(vote => {
+                    if (Array.isArray(vote)) {
+                      totalCount += vote.length;
+                    } else {
+                      totalCount += 1;
+                    }
+                  });
+                  // Add abstained positions count
+                  totalCount += Object.keys(abstainedPositions).length;
+                  return totalCount;
+                })()}
               </span>
             )}
           </button>
@@ -419,6 +542,9 @@ const VotingPage = () => {
               </div>
               <h2>{selectedCandidate.name}</h2>
               <p className="voting-modal-position">{selectedCandidate.position}</p>
+              {selectedCandidate.school && (
+                <p className="voting-modal-school">School: {selectedCandidate.school}</p>
+              )}
             </div>
 
             <div className="voting-modal-body">
@@ -456,9 +582,13 @@ const VotingPage = () => {
                 }}
                 disabled={votingClosed || hasVoted}
               >
-                {selectedVotes[selectedCandidate.position] === selectedCandidate.id
-                  ? 'SELECTED'
-                  : 'VOTE FOR THIS CANDIDATE'}
+                {(() => {
+                  const positionVotes = selectedVotes[selectedCandidate.position];
+                  const isSelected = Array.isArray(positionVotes)
+                    ? positionVotes.includes(selectedCandidate.id)
+                    : positionVotes === selectedCandidate.id;
+                  return isSelected ? 'SELECTED' : 'VOTE FOR THIS CANDIDATE';
+                })()}
               </button>
             </div>
           </div>

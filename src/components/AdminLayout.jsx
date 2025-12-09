@@ -1,19 +1,76 @@
+import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { auth, db } from '../config/firebase';
 import './AdminLayout.css';
 
 const AdminLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [userRole, setUserRole] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
 
-  const menuItems = [
-    { name: 'Dashboard', path: '/admin/dashboard' },
-    { name: 'Manage Voters', path: '/admin/manage-voters' },
-    { name: 'Manage Candidates', path: '/admin/manage-candidates' },
-    { name: 'Voting Control', path: '/admin/voting-control' },
-    { name: 'Announcements', path: '/admin/announcements' },
+  useEffect(() => {
+    fetchUserRole();
+  }, []);
+
+  // Listen for pending voter registrations
+  useEffect(() => {
+    const votersRef = collection(db, 'voters');
+    const pendingQuery = query(
+      votersRef,
+      where('status', '==', 'pending')
+    );
+
+    const unsubscribe = onSnapshot(pendingQuery, (snapshot) => {
+      setPendingCount(snapshot.size);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const fetchUserRole = async () => {
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+        if (adminDoc.exists()) {
+          // Trim role to remove any trailing spaces
+          const role = (adminDoc.data().role || 'moderator').trim();
+          setUserRole(role);
+          console.log('Admin role loaded:', role);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Define all menu items with required roles
+  const allMenuItems = [
+    { name: 'Dashboard', path: '/admin/dashboard', roles: ['superadmin', 'moderator'] },
+    { name: 'Manage Voters', path: '/admin/manage-voters', roles: ['superadmin', 'moderator'] },
+    { name: 'Manage Candidates', path: '/admin/manage-candidates', roles: ['superadmin', 'moderator'] },
+    { name: 'Voting Control', path: '/admin/voting-control', roles: ['superadmin'] },
+    { name: 'Announcements', path: '/admin/announcements', roles: ['superadmin', 'moderator'] },
+    { name: 'Manage Admins', path: '/admin/manage-admins', roles: ['superadmin'] },
   ];
+
+  // Filter menu items based on user role
+  // Show all items while loading, then filter based on role
+  const menuItems = loading || !userRole 
+    ? allMenuItems 
+    : allMenuItems.filter(item => {
+        const hasAccess = item.roles.includes(userRole);
+        console.log(`Menu item "${item.name}" - Role: ${userRole}, Has access: ${hasAccess}`);
+        return hasAccess;
+      });
+  
+  console.log('Current userRole:', userRole, 'Loading:', loading, 'Menu items count:', menuItems.length);
 
   const handleLogout = async () => {
     try {
@@ -34,35 +91,11 @@ const AdminLayout = () => {
       <aside className="admin-sidebar">
         {/* Logo */}
         <div className="admin-sidebar-logo">
-          <svg
+          <img 
+            src="/ntc-logo.png" 
+            alt="NTC Logo" 
             className="admin-logo-image"
-            viewBox="0 0 100 100"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <circle cx="50" cy="50" r="48" fill="#003366" stroke="#fbbf24" strokeWidth="2" />
-            <circle cx="50" cy="50" r="35" fill="#fbbf24" />
-            <circle cx="50" cy="50" r="20" fill="#003366" />
-            <circle cx="50" cy="50" r="8" fill="#fbbf24" />
-            {[...Array(8)].map((_, i) => {
-              const angle = (i * 45 * Math.PI) / 180;
-              const x1 = 50 + 20 * Math.cos(angle);
-              const y1 = 50 + 20 * Math.sin(angle);
-              const x2 = 50 + 35 * Math.cos(angle);
-              const y2 = 50 + 35 * Math.sin(angle);
-              return (
-                <line
-                  key={i}
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
-                  stroke="#003366"
-                  strokeWidth="2"
-                />
-              );
-            })}
-          </svg>
+          />
           <p className="admin-logo-text">NTC Admin</p>
         </div>
 
@@ -76,6 +109,9 @@ const AdminLayout = () => {
                   className={`admin-nav-button ${isActive(item.path) ? 'active' : ''}`}
                 >
                   {item.name}
+                  {item.name === 'Manage Voters' && pendingCount > 0 && (
+                    <span className="admin-badge">{pendingCount}</span>
+                  )}
                 </button>
               </li>
             ))}

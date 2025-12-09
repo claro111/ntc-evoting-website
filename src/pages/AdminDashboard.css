@@ -61,8 +61,12 @@
 .voting-status-card {
   background: #1e3a8a;
   border-radius: 12px;
-  padding: 20px;
+  padding: 30px 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .voting-status-title {
@@ -76,12 +80,12 @@
 .voting-status-badge {
   background: white;
   color: #1e3a8a;
-  padding: 10px 30px;
+  padding: 12px 40px;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   text-align: center;
-  margin-bottom: 15px;
+  margin-bottom: 0;
 }
 
 .publish-button {
@@ -115,6 +119,46 @@
   color: #1e3a8a;
 }
 
+.statistics-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.archive-button {
+  background: #059669;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+
+.archive-button:hover:not(.disabled) {
+  background: #047857;
+}
+
+.archive-button.disabled {
+  background: #d1d5db;
+  color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.archive-button.disabled:hover {
+  background: #d1d5db;
+}
+
+.export-dropdown-container {
+  position: relative;
+}
+
 .export-button {
   background: #1e3a8a;
   color: white;
@@ -130,8 +174,56 @@
   transition: background 0.2s;
 }
 
-.export-button:hover {
+.export-button:hover:not(.disabled) {
   background: #1e40af;
+}
+
+.export-button.disabled {
+  background: #d1d5db;
+  color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.export-button.disabled:hover {
+  background: #d1d5db;
+}
+
+.export-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 220px;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.export-menu-item {
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: white;
+  color: #1e3a8a;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: background 0.2s;
+  text-align: left;
+}
+
+.export-menu-item:hover {
+  background: #f3f4f6;
+}
+
+.export-menu-item svg {
+  flex-shrink: 0;
 }
 
 .statistics-grid {
@@ -439,4 +531,228 @@
   padding: 30px;
   color: #9ca3af;
   font-size: 14px;
+}
+
+/* Tie Breaking Styles */
+.tie-warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  background: #FFF3CD;
+  border: 2px solid #FFC107;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.tie-warning-banner.resolved {
+  background: #E8F5E9;
+  border: 2px solid #4CAF50;
+}
+
+.tie-warning-banner.resolved .tie-warning-content strong,
+.tie-warning-banner.resolved .tie-warning-content p {
+  color: #2E7D32;
+}
+
+.tie-warning-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.tie-warning-content {
+  flex: 1;
+}
+
+.tie-warning-content strong {
+  display: block;
+  color: #856404;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.tie-warning-content p {
+  color: #856404;
+  font-size: 0.875rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.tied-candidates-section {
+  background: #FFF9E6;
+  border: 1px solid #FFE082;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.tied-candidate-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: white;
+  border: 1px solid #E0E0E0;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  transition: all 0.2s;
+}
+
+.tied-candidate-item:last-child {
+  margin-bottom: 0;
+}
+
+.tied-candidate-item.selected {
+  background: #E8F5E9;
+  border: 2px solid #4CAF50;
+}
+
+.tied-candidate-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tied-candidate-name {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 0.9375rem;
+}
+
+.tied-candidate-votes {
+  font-size: 0.8125rem;
+  color: #718096;
+}
+
+.btn-select-winner {
+  padding: 0.5rem 1rem;
+  background: #003366;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-select-winner:hover:not(:disabled) {
+  background: #002244;
+}
+
+.btn-select-winner.selected {
+  background: #4CAF50;
+  cursor: default;
+}
+
+.btn-select-winner:disabled {
+  background: #BDBDBD;
+  color: #757575;
+  cursor: not-allowed;
+}
+
+/* Finalized Tie Breaking Styles */
+.tie-finalized-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  background: #E8F5E9;
+  border: 2px solid #4CAF50;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.tie-finalized-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.tie-finalized-content {
+  flex: 1;
+}
+
+.tie-finalized-content strong {
+  display: block;
+  color: #2E7D32;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.tie-finalized-content p {
+  color: #2E7D32;
+  font-size: 0.875rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.tied-candidates-section.finalized {
+  background: #F5F5F5;
+  border: 1px solid #BDBDBD;
+}
+
+.tied-candidate-item.finalized {
+  background: #FAFAFA;
+  border: 1px solid #E0E0E0;
+  cursor: default;
+}
+
+.tied-candidate-item.selected.finalized {
+  background: #E8F5E9;
+  border: 2px solid #66BB6A;
+}
+
+.selected-badge.finalized {
+  background: #66BB6A;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-left: 0.5rem;
+}
+
+.finalized-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #E8F5E9;
+  color: #2E7D32;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.finalized-badge svg {
+  flex-shrink: 0;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.selected-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.125rem 0.5rem;
+  background: #4CAF50;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+.candidate-item.manually-selected {
+  border-left: 4px solid #FFC107;
+  background: #FFFBF0;
+}
+
+.manual-winner-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: #FFC107;
+  color: #856404;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
 }

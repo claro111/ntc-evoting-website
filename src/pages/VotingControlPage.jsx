@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs, writeBatch, Timestamp, onSnapshot } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, writeBatch, Timestamp, onSnapshot, query, where, getCountFromServer } from 'firebase/firestore';
+import { db, auth } from '../config/firebase';
+import Toast from '../components/Toast';
+import InputConfirmDialog from '../components/InputConfirmDialog';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useToast } from '../hooks/useToast';
+import { useInputConfirm } from '../hooks/useInputConfirm';
+import { useConfirm } from '../hooks/useConfirm';
 import './VotingControlPage.css';
 
 const VotingControlPage = () => {
@@ -8,6 +14,9 @@ const VotingControlPage = () => {
   const [electionStatus, setElectionStatus] = useState(null);
   const [votingDuration, setVotingDuration] = useState('');
   const [startConfirmed, setStartConfirmed] = useState(false);
+  const { toast, showToast, hideToast } = useToast();
+  const { confirmDialog, showInputConfirm } = useInputConfirm();
+  const { confirmState, showConfirm } = useConfirm();
   const [closeConfirmed, setCloseConfirmed] = useState(false);
   const [resetConfirmed, setResetConfirmed] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -140,13 +149,13 @@ const VotingControlPage = () => {
 
   const handleStartVoting = async () => {
     if (!startConfirmed) {
-      alert('Please confirm that you want to start the voting session');
+      showToast('Please confirm that you want to start the voting session', 'warning');
       return;
     }
 
     const duration = parseInt(votingDuration);
     if (!duration || duration < 1 || duration > 168) {
-      alert('Please enter a valid duration between 1 and 168 hours (7 days)');
+      showToast('Please enter a valid duration between 1 and 168 hours (7 days)', 'warning');
       return;
     }
 
@@ -166,20 +175,20 @@ const VotingControlPage = () => {
         updatedAt: now,
       });
 
-      alert('Voting session started successfully!');
+      showToast('Voting session started successfully!', 'success');
       setVotingDuration('');
       setStartConfirmed(false);
       setProcessing(false);
     } catch (err) {
       console.error('Error starting voting:', err);
-      alert('Failed to start voting session. Please try again.');
+      showToast('Failed to start voting session. Please try again.', 'error');
       setProcessing(false);
     }
   };
 
   const handleCloseVoting = async (isAutoClose = false) => {
     if (!isAutoClose && !closeConfirmed) {
-      alert('Please confirm that you want to close the voting session');
+      showToast('Please confirm that you want to close the voting session', 'warning');
       return;
     }
 
@@ -197,13 +206,13 @@ const VotingControlPage = () => {
       await calculateVoteTally();
 
       if (!isAutoClose) {
-        alert('Voting session closed successfully! Vote tally has been calculated.');
+        showToast('Voting session closed successfully! Vote tally has been calculated.', 'success');
       }
       setCloseConfirmed(false);
       setProcessing(false);
     } catch (err) {
       console.error('Error closing voting:', err);
-      alert('Failed to close voting session. Please try again.');
+      showToast('Failed to close voting session. Please try again.', 'error');
       setProcessing(false);
     }
   };
@@ -239,49 +248,178 @@ const VotingControlPage = () => {
 
   const handlePublishResults = async () => {
     if (electionStatus?.status === 'active') {
-      alert('Cannot publish results while voting is active. Please close the voting session first.');
+      showToast('Cannot publish results while voting is active. Please close the voting session first.', 'warning');
       return;
     }
 
-    const confirmPublish = window.confirm(
-      'Are you sure you want to publish the results? This will make the vote counts visible to all voters.'
-    );
+    const confirmPublish = await showConfirm({
+      title: 'Publish Results',
+      message: 'Are you sure you want to publish the results? This will make the vote counts visible to all voters and archive this election.',
+      confirmText: 'Publish',
+      cancelText: 'Cancel',
+      type: 'warning'
+    });
 
     if (!confirmPublish) return;
 
     try {
       setProcessing(true);
 
-      const electionRef = doc(db, 'elections', 'current');
-      await updateDoc(electionRef, {
+      // Create a snapshot of current election data for archiving
+      const positionsSnapshot = await getDocs(collection(db, 'positions'));
+      const positions = positionsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })).sort((a, b) => (a.order || 0) - (b.order || 0));
+      
+      const candidatesSnapshot = await getDocs(collection(db, 'candidates'));
+      const candidates = candidatesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      const votesSnapshot = await getDocs(collection(db, 'votes'));
+      const votes = votesSnapshot.docs.map(doc => doc.data());
+      
+      // Calculate results by position
+      const results = positions.map(position => {
+        const positionCandidates = candidates
+          .filter(c => c.position === position.name)
+          .map(candidate => {
+            const voteCount = votes.filter(v => v.candidateId === candidate.id).length;
+            return { ...candidate, voteCount };
+          })
+          .sort((a, b) => {
+            if (a.manuallySelectedWinner && !b.manuallySelectedWinner) return -1;
+            if (!a.manuallySelectedWinner && b.manuallySelectedWinner) return 1;
+            return b.voteCount - a.voteCount;
+          });
+        
+        const totalVotes = positionCandidates.reduce((sum, c) => sum + c.voteCount, 0);
+        
+        const candidatesWithStats = positionCandidates.map((candidate, index) => ({
+          ...candidate,
+          rank: index + 1,
+          percentage: totalVotes > 0 ? ((candidate.voteCount / totalVotes) * 100).toFixed(1) : 0,
+          isWinner: candidate.manuallySelectedWinner || index < (position.maxSelection || 1)
+        }));
+        
+        return {
+          position,
+          candidates: candidatesWithStats,
+          totalVotes
+        };
+      });
+
+      // Get voter statistics
+      const votersRef = collection(db, 'voters');
+      const registeredQuery = query(
+        votersRef,
+        where('status', '==', 'registered'),
+        where('emailVerified', '==', true)
+      );
+      const registeredSnapshot = await getCountFromServer(registeredQuery);
+      const totalRegistered = registeredSnapshot.data().count;
+
+      const votedQuery = query(
+        votersRef,
+        where('status', '==', 'registered'),
+        where('hasVoted', '==', true)
+      );
+      const votedSnapshot = await getCountFromServer(votedQuery);
+      const alreadyVoted = votedSnapshot.data().count;
+
+      // Create archived election document with snapshot
+      const archivedElectionRef = doc(collection(db, 'elections'));
+      await setDoc(archivedElectionRef, {
+        name: electionStatus?.name || `Election ${new Date().toLocaleDateString()}`,
+        status: 'closed',
+        startTime: electionStatus?.startTime || Timestamp.now(),
+        endTime: electionStatus?.endTime || Timestamp.now(),
+        closedAt: electionStatus?.closedAt || Timestamp.now(),
+        resultsPublished: true,
+        publishedAt: Timestamp.now(),
+        snapshot: {
+          results,
+          statistics: {
+            totalRegistered,
+            alreadyVoted,
+            notYetVoted: totalRegistered - alreadyVoted,
+            voterTurnout: totalRegistered > 0 ? ((alreadyVoted / totalRegistered) * 100).toFixed(1) : 0
+          }
+        },
+        createdAt: Timestamp.now()
+      });
+
+      // Update current election to mark as published
+      const currentElectionRef = doc(db, 'elections', 'current');
+      await updateDoc(currentElectionRef, {
         resultsPublished: true,
         publishedAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
 
-      alert('Results published successfully! Voters can now see the election results.');
+      // Create announcement for published results
+      try {
+        const announcementRef = doc(collection(db, 'announcements'));
+        const announcementData = {
+          title: '🏆 Election Results Published!',
+          description: `<p>The election results are now available! 🎉</p>
+<p>Thank you to everyone who participated in this election. Your voice matters!</p>
+<p><strong>What's next?</strong></p>
+<ul>
+<li>View the complete results on the homepage</li>
+<li>See the top 3 candidates for each position</li>
+<li>Check out the winners and vote statistics</li>
+</ul>
+<p>Congratulations to all the winners! 🏆</p>`,
+          isActive: true,
+          createdAt: Timestamp.now(),
+          createdBy: auth.currentUser?.uid || 'system',
+        };
+        
+        console.log('Creating announcement:', announcementData);
+        await setDoc(announcementRef, announcementData);
+        console.log('Announcement created successfully with ID:', announcementRef.id);
+      } catch (announcementError) {
+        console.error('Error creating announcement:', announcementError);
+        // Don't fail the whole operation if announcement creation fails
+      }
+
+      showToast('Results published successfully! Election has been archived and an announcement has been created.', 'success');
       setProcessing(false);
     } catch (err) {
       console.error('Error publishing results:', err);
-      alert('Failed to publish results. Please try again.');
+      showToast('Failed to publish results. Please try again.', 'error');
       setProcessing(false);
     }
   };
 
   const handleResetSystem = async () => {
     if (!resetConfirmed) {
-      alert('Please confirm that you understand this action will permanently reset all voting data');
+      showToast('Please confirm that you understand this action will permanently reset all voting data', 'warning');
       return;
     }
 
-    if (electionStatus?.status === 'active') {
-      alert('Cannot reset system while voting is active. Please close the voting session first.');
-      return;
-    }
+    const confirmed = await showInputConfirm({
+      title: 'Reset System',
+      message: 'Are you sure you want to reset the entire voting system?',
+      subtitle: 'This action cannot be undone!',
+      warningItems: [
+        'All votes will be permanently deleted',
+        'All vote receipts will be removed',
+        'Voter "hasVoted" status will be reset',
+        'Candidate vote counts will be reset to 0',
+        'Manual winner selections will be cleared',
+        'This action CANNOT be reversed'
+      ],
+      confirmWord: 'RESET',
+      placeholder: 'RESET',
+      confirmButtonText: 'Reset System'
+    });
 
-    const confirmText = prompt('Type "RESET" to confirm this action:');
-    if (confirmText !== 'RESET') {
-      alert('Reset cancelled');
+    if (!confirmed) {
+      showToast('Reset cancelled', 'info');
       return;
     }
 
@@ -318,13 +456,15 @@ const VotingControlPage = () => {
       });
       await voterBatch.commit();
 
-      // Reset candidate vote counts
+      // Reset candidate vote counts and manual winner selections
       const candidatesRef = collection(db, 'candidates');
       const candidatesSnapshot = await getDocs(candidatesRef);
       const candidateBatch = writeBatch(db);
       candidatesSnapshot.docs.forEach((doc) => {
         candidateBatch.update(doc.ref, {
           voteCount: 0,
+          manuallySelectedWinner: false,
+          selectedAt: null,
         });
       });
       await candidateBatch.commit();
@@ -342,12 +482,12 @@ const VotingControlPage = () => {
         updatedAt: Timestamp.now(),
       });
 
-      alert('System reset successfully! All voting data has been cleared.');
+      showToast('System reset successfully! All voting data has been cleared.', 'success');
       setResetConfirmed(false);
       setProcessing(false);
     } catch (err) {
       console.error('Error resetting system:', err);
-      alert('Failed to reset system. Please try again.');
+      showToast('Failed to reset system. Please try again.', 'error');
       setProcessing(false);
     }
   };
@@ -558,16 +698,50 @@ const VotingControlPage = () => {
           <button
             className="btn-reset"
             onClick={handleResetSystem}
-            disabled={processing || !resetConfirmed || isActive}
+            disabled={processing || !resetConfirmed}
           >
             {processing ? 'Resetting...' : 'Reset System'}
           </button>
-
-          {isActive && (
-            <p className="error-message">Cannot reset system while voting is active</p>
-          )}
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={hideToast}
+        />
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          warningText={confirmState.warningText}
+          confirmText={confirmState.confirmText}
+          cancelText={confirmState.cancelText}
+          type={confirmState.type}
+          onConfirm={confirmState.onConfirm}
+          onCancel={confirmState.onCancel}
+        />
+      )}
+
+      {/* Input Confirm Dialog */}
+      {confirmDialog && (
+        <InputConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          subtitle={confirmDialog.subtitle}
+          warningItems={confirmDialog.warningItems}
+          confirmWord={confirmDialog.confirmWord}
+          placeholder={confirmDialog.placeholder}
+          confirmButtonText={confirmDialog.confirmButtonText}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={confirmDialog.onCancel}
+        />
+      )}
     </div>
   );
 };

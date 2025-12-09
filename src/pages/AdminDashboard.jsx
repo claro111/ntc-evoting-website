@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, getCountFromServer, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, getCountFromServer, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalRegistered: 0,
     alreadyVoted: 0,
@@ -18,6 +23,10 @@ const AdminDashboard = () => {
   const [votes, setVotes] = useState([]);
   const [yearLevelData, setYearLevelData] = useState([]);
   const [schoolData, setSchoolData] = useState([]);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [tieBreakingData, setTieBreakingData] = useState({});
+  const [selectedPositionFilter, setSelectedPositionFilter] = useState('all');
+  const [resultsPublished, setResultsPublished] = useState(false);
 
   useEffect(() => {
     console.log('AdminDashboard: Setting up real-time listeners');
@@ -81,31 +90,34 @@ const AdminDashboard = () => {
       }
     );
 
-    // Real-time listener for elections to update voting status
-    const electionsRef = collection(db, 'elections');
+    // Real-time listener for elections to update voting status and results published flag
+    const electionRef = doc(db, 'elections', 'current');
     const unsubscribeElection = onSnapshot(
-      electionsRef,
-      (electionSnapshot) => {
-        console.log('Elections updated:', electionSnapshot.size);
-        const activeElection = electionSnapshot.docs.find(doc => doc.data().status === 'active');
-        
-        if (activeElection) {
-          const electionData = activeElection.data();
+      electionRef,
+      (electionDoc) => {
+        console.log('Election updated');
+        if (electionDoc.exists()) {
+          const electionData = electionDoc.data();
           const now = new Date();
           const startTime = electionData.startTime?.toDate();
           const endTime = electionData.endTime?.toDate();
 
-          if (startTime && endTime && now >= startTime && now <= endTime) {
+          // Update voting status
+          if (electionData.status === 'active' && startTime && endTime && now >= startTime && now <= endTime) {
             setVotingStatus('OPEN');
           } else {
             setVotingStatus('CLOSED');
           }
+
+          // Update results published flag
+          setResultsPublished(electionData.resultsPublished || false);
         } else {
           setVotingStatus('CLOSED');
+          setResultsPublished(false);
         }
       },
       (error) => {
-        console.error('Error in elections listener:', error);
+        console.error('Error in election listener:', error);
       }
     );
 
@@ -242,9 +254,190 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleExportReports = () => {
-    // TODO: Implement export functionality
-    alert('Export functionality will be implemented in a future update');
+  const handleExportPDF = () => {
+    setShowExportMenu(false);
+    
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      
+      // Title
+      doc.setFontSize(18);
+      doc.setFont(undefined, 'bold');
+      doc.text('NTC E-VOTING SYSTEM', pageWidth / 2, 15, { align: 'center' });
+      doc.setFontSize(14);
+      doc.text('COMPREHENSIVE REPORT', pageWidth / 2, 22, { align: 'center' });
+      
+      // Date
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 28, { align: 'center' });
+      
+      let yPos = 38;
+      
+      // Voting Statistics
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('VOTING STATISTICS', 14, yPos);
+      yPos += 8;
+      
+      const statsData = [
+        ['Total Registered Voters', stats.totalRegistered.toString()],
+        ['Already Voted', stats.alreadyVoted.toString()],
+        ['Not Yet Voted', stats.notYetVoted.toString()],
+        ['Voter Turnout', `${stats.voterTurnout}%`]
+      ];
+      
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Metric', 'Value']],
+        body: statsData,
+        theme: 'grid',
+        headStyles: { fillColor: [30, 58, 138] },
+        margin: { left: 14, right: 14 }
+      });
+      
+      yPos = doc.lastAutoTable.finalY + 10;
+      
+      // Live Vote Results
+      positions.forEach((position) => {
+        if (yPos > 250) {
+          doc.addPage();
+          yPos = 20;
+        }
+        
+        const positionCandidates = getCandidatesForPosition(position.name);
+        const totalVotes = positionCandidates.reduce((sum, c) => sum + c.voteCount, 0);
+        
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text(position.name, 14, yPos);
+        yPos += 5;
+        
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Total Votes: ${totalVotes} | Winners Needed: ${position.maxSelection || 1}`, 14, yPos);
+        yPos += 5;
+        
+        const candidateData = positionCandidates.map(c => {
+          const nameWithIndicator = c.manuallySelectedWinner ? `${c.name} (Manual Winner)` : c.name;
+          return [
+            `#${c.rank}`,
+            nameWithIndicator,
+            c.voteCount.toString(),
+            `${c.percentage}%`
+          ];
+        });
+        
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Rank', 'Candidate Name', 'Votes', 'Percentage']],
+          body: candidateData,
+          theme: 'striped',
+          headStyles: { fillColor: [37, 99, 235] },
+          margin: { left: 14, right: 14 }
+        });
+        
+        yPos = doc.lastAutoTable.finalY + 10;
+      });
+      
+      doc.save(`NTC_Voting_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please try again.');
+    }
+  };
+
+  const handleExportExcel = () => {
+    setShowExportMenu(false);
+    
+    const workbook = XLSX.utils.book_new();
+    
+    // Statistics Sheet
+    const statsData = [
+      ['NTC E-VOTING SYSTEM - COMPREHENSIVE REPORT'],
+      [`Generated: ${new Date().toLocaleString()}`],
+      [],
+      ['VOTING STATISTICS'],
+      ['Metric', 'Value'],
+      ['Total Registered Voters', stats.totalRegistered],
+      ['Already Voted', stats.alreadyVoted],
+      ['Not Yet Voted', stats.notYetVoted],
+      ['Voter Turnout', `${stats.voterTurnout}%`]
+    ];
+    
+    const statsSheet = XLSX.utils.aoa_to_sheet(statsData);
+    XLSX.utils.book_append_sheet(workbook, statsSheet, 'Statistics');
+    
+    // Results Sheet
+    const resultsData = [['Position', 'Rank', 'Candidate Name', 'Votes', 'Percentage', 'Manual Winner']];
+    
+    positions.forEach(position => {
+      const positionCandidates = getCandidatesForPosition(position.name);
+      positionCandidates.forEach(c => {
+        resultsData.push([
+          position.name,
+          `#${c.rank}`,
+          c.name,
+          c.voteCount,
+          `${c.percentage}%`,
+          c.manuallySelectedWinner ? 'YES' : 'NO'
+        ]);
+      });
+    });
+    
+    const resultsSheet = XLSX.utils.aoa_to_sheet(resultsData);
+    XLSX.utils.book_append_sheet(workbook, resultsSheet, 'Results');
+    
+    // Demographics Sheet
+    const demographicsData = [
+      ['VOTING BY YEAR LEVEL'],
+      ['Year Level', 'Voted', 'Not Voted'],
+      ...yearLevelData.map(d => [d.name, d.Voted, d['Not Voted']]),
+      [],
+      ['VOTING BY SCHOOL'],
+      ['School', 'Voted', 'Not Voted'],
+      ...schoolData.map(d => [d.name, d.Voted, d['Not Voted']])
+    ];
+    
+    const demographicsSheet = XLSX.utils.aoa_to_sheet(demographicsData);
+    XLSX.utils.book_append_sheet(workbook, demographicsSheet, 'Demographics');
+    
+    XLSX.writeFile(workbook, `NTC_Voting_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const handleExportCSV = () => {
+    setShowExportMenu(false);
+    // Generate detailed CSV
+    let csvContent = 'Position,Rank,Candidate Name,Votes,Percentage,Manual Winner\n';
+    
+    positions.forEach(position => {
+      const positionCandidates = getCandidatesForPosition(position.name);
+      positionCandidates.forEach(c => {
+        const manualWinner = c.manuallySelectedWinner ? 'YES' : 'NO';
+        csvContent += `"${position.name}",${c.rank},"${c.name}",${c.voteCount},${c.percentage}%,${manualWinner}\n`;
+      });
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `NTC_Voting_Results_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const generateReportData = () => {
+    return {
+      stats,
+      positions: positions.map(position => ({
+        ...position,
+        candidates: getCandidatesForPosition(position.name)
+      }))
+    };
   };
 
   // Calculate vote counts for each candidate
@@ -260,7 +453,13 @@ const AdminDashboard = () => {
         ...candidate,
         voteCount: getCandidateVotes(candidate.id),
       }))
-      .sort((a, b) => b.voteCount - a.voteCount); // Sort by votes descending
+      .sort((a, b) => {
+        // If one candidate is manually selected as winner, they should be ranked first
+        if (a.manuallySelectedWinner && !b.manuallySelectedWinner) return -1;
+        if (!a.manuallySelectedWinner && b.manuallySelectedWinner) return 1;
+        // Otherwise sort by vote count
+        return b.voteCount - a.voteCount;
+      });
 
     const totalVotes = positionCandidates.reduce((sum, c) => sum + c.voteCount, 0);
 
@@ -268,7 +467,70 @@ const AdminDashboard = () => {
       ...candidate,
       rank: index + 1,
       percentage: totalVotes > 0 ? ((candidate.voteCount / totalVotes) * 100).toFixed(1) : 0,
+      isWinner: candidate.manuallySelectedWinner || index === 0, // Winner if manually selected or ranked first
     }));
+  };
+
+  // Detect ties in voting results
+  const detectTies = (positionName, maxSelection = 1) => {
+    const positionCandidates = getCandidatesForPosition(positionName);
+    
+    if (positionCandidates.length === 0) return null;
+
+    // Find candidates at the winning threshold
+    const winningThreshold = positionCandidates[Math.min(maxSelection - 1, positionCandidates.length - 1)]?.voteCount;
+    
+    // Get all candidates with the winning vote count (excluding those with 0 votes)
+    const tiedCandidates = positionCandidates.filter(c => c.voteCount === winningThreshold && c.voteCount > 0);
+    
+    // Check if a winner has been manually selected
+    const hasManualSelection = tiedCandidates.some(c => c.manuallySelectedWinner === true);
+    
+    // Show tie section if more than one candidate has the winning vote count
+    if (tiedCandidates.length > 1) {
+      return {
+        position: positionName,
+        voteCount: winningThreshold,
+        candidates: tiedCandidates,
+        maxSelection,
+        hasManualSelection
+      };
+    }
+    
+    return null;
+  };
+
+  // Handle manual winner selection for ties
+  const handleSelectWinner = async (positionName, candidateId) => {
+    try {
+      // Get all candidates for this position
+      const positionCandidates = candidates.filter(c => c.position === positionName);
+      
+      // First, clear any existing manual winner selections for this position
+      const clearPromises = positionCandidates.map(async (candidate) => {
+        if (candidate.manuallySelectedWinner) {
+          const candidateRef = doc(db, 'candidates', candidate.id);
+          await updateDoc(candidateRef, {
+            manuallySelectedWinner: false,
+            selectedAt: null
+          });
+        }
+      });
+      
+      await Promise.all(clearPromises);
+      
+      // Then set the selected candidate as winner
+      const candidateRef = doc(db, 'candidates', candidateId);
+      await updateDoc(candidateRef, {
+        manuallySelectedWinner: true,
+        selectedAt: new Date()
+      });
+      
+      alert('Winner selected successfully! Other tied candidates have been deselected.');
+    } catch (error) {
+      console.error('Error selecting winner:', error);
+      alert('Failed to select winner. Please try again.');
+    }
   };
 
   if (loading) {
@@ -300,24 +562,85 @@ const AdminDashboard = () => {
         <div className="voting-status-card">
           <h3 className="voting-status-title">Voting Status</h3>
           <div className="voting-status-badge">{votingStatus}</div>
-          <button className="publish-button">Publish Results in App</button>
         </div>
       </div>
 
       {/* Statistics Section */}
       <div className="statistics-header">
         <h3 className="statistics-title">Voting Statistics</h3>
-        <button onClick={handleExportReports} className="export-button">
-          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          Export All Reports ▼
-        </button>
+        <div className="statistics-actions">
+          <button 
+            onClick={() => resultsPublished && navigate('/admin/archive')} 
+            className={`archive-button ${!resultsPublished ? 'disabled' : ''}`}
+            disabled={!resultsPublished}
+            title={!resultsPublished ? 'Available only after results are published' : 'View archived election results'}
+          >
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+              />
+            </svg>
+            Archived Results
+          </button>
+          <div className="export-dropdown-container">
+          <button 
+            onClick={() => resultsPublished && setShowExportMenu(!showExportMenu)} 
+            className={`export-button ${!resultsPublished ? 'disabled' : ''}`}
+            disabled={!resultsPublished}
+            title={!resultsPublished ? 'Available only after results are published' : 'Export reports'}
+          >
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+            Export All Reports ▼
+          </button>
+          {showExportMenu && resultsPublished && (
+            <div className="export-dropdown-menu">
+              <button onClick={handleExportPDF} className="export-menu-item">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                  />
+                </svg>
+                Export as PDF
+              </button>
+              <button onClick={handleExportExcel} className="export-menu-item">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                Export as Excel
+              </button>
+              <button onClick={handleExportCSV} className="export-menu-item">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                Export as CSV
+              </button>
+            </div>
+          )}
+          </div>
+        </div>
       </div>
 
       <div className="statistics-grid">
@@ -441,8 +764,17 @@ const AdminDashboard = () => {
       <div className="live-results-section">
         <div className="live-results-header">
           <h3 className="live-results-title">Live Vote Results</h3>
-          <select className="position-filter">
-            <option>All Positions</option>
+          <select 
+            className="position-filter"
+            value={selectedPositionFilter}
+            onChange={(e) => setSelectedPositionFilter(e.target.value)}
+          >
+            <option value="all">All Positions</option>
+            {positions.map((position) => (
+              <option key={position.id} value={position.name}>
+                {position.name}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -451,9 +783,12 @@ const AdminDashboard = () => {
             <p>No positions created yet. Go to Manage Candidates to add positions.</p>
           </div>
         ) : (
-          positions.map((position) => {
+          positions
+            .filter((position) => selectedPositionFilter === 'all' || position.name === selectedPositionFilter)
+            .map((position) => {
             const positionCandidates = getCandidatesForPosition(position.name);
             const totalVotes = positionCandidates.reduce((sum, c) => sum + c.voteCount, 0);
+            const tieInfo = detectTies(position.name, position.maxSelection || 1);
 
             return (
               <div key={position.id} className="position-section">
@@ -463,6 +798,92 @@ const AdminDashboard = () => {
                     Total Votes: {totalVotes} | Winners Needed: {position.maxSelection || 1}
                   </p>
                 </div>
+
+                {/* Tie Detection Warning - Only show when voting is closed and results not published */}
+                {tieInfo && votingStatus === 'CLOSED' && !resultsPublished && (
+                  <div className={`tie-warning-banner ${tieInfo.hasManualSelection ? 'resolved' : ''}`}>
+                    <div className="tie-warning-icon">{tieInfo.hasManualSelection ? '✓' : '⚠️'}</div>
+                    <div className="tie-warning-content">
+                      <strong>{tieInfo.hasManualSelection ? 'Tie Resolved - Winner Selected' : 'Tie Detected - Manual Selection Required'}</strong>
+                      <p>
+                        {tieInfo.hasManualSelection 
+                          ? `A winner has been manually selected from the tied candidates. You can reselect a different winner if needed.`
+                          : `The following candidates are tied with ${tieInfo.voteCount} votes each. You need to manually select ${tieInfo.maxSelection} winner(s) from the tied candidates.`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Results Published - Tie Finalized Banner */}
+                {tieInfo && votingStatus === 'CLOSED' && resultsPublished && tieInfo.hasManualSelection && (
+                  <div className="tie-finalized-banner">
+                    <div className="tie-finalized-icon">🔒</div>
+                    <div className="tie-finalized-content">
+                      <strong>Tie Resolved - Results Published</strong>
+                      <p>
+                        The manual winner selection has been finalized and published. Changes are no longer allowed.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tied Candidates Selection - Only show when voting is closed and results not published */}
+                {tieInfo && votingStatus === 'CLOSED' && !resultsPublished && (
+                  <div className="tied-candidates-section">
+                    {tieInfo.candidates.map((candidate) => {
+                      const isSelected = candidate.manuallySelectedWinner === true;
+                      
+                      return (
+                        <div key={candidate.id} className={`tied-candidate-item ${isSelected ? 'selected' : ''}`}>
+                          <div className="tied-candidate-info">
+                            <span className="tied-candidate-name">
+                              {candidate.name}
+                              {isSelected && <span className="selected-badge">✓ Selected</span>}
+                            </span>
+                            <span className="tied-candidate-votes">{candidate.voteCount} votes</span>
+                          </div>
+                          <button
+                            className={`btn-select-winner ${isSelected ? 'selected' : ''}`}
+                            onClick={() => handleSelectWinner(position.name, candidate.id)}
+                          >
+                            {isSelected ? 'Selected as Winner' : 'Select as Winner'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Tied Candidates Display Only - Show when results are published */}
+                {tieInfo && votingStatus === 'CLOSED' && resultsPublished && (
+                  <div className="tied-candidates-section finalized">
+                    {tieInfo.candidates.map((candidate) => {
+                      const isSelected = candidate.manuallySelectedWinner === true;
+                      
+                      return (
+                        <div key={candidate.id} className={`tied-candidate-item ${isSelected ? 'selected finalized' : 'finalized'}`}>
+                          <div className="tied-candidate-info">
+                            <span className="tied-candidate-name">
+                              {candidate.name}
+                              {isSelected && <span className="selected-badge finalized">✓ Winner</span>}
+                            </span>
+                            <span className="tied-candidate-votes">{candidate.voteCount} votes</span>
+                          </div>
+                          {isSelected && (
+                            <div className="finalized-badge">
+                              <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                              </svg>
+                              Finalized
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <div className="candidate-list">
                   {positionCandidates.length === 0 ? (
                     <p className="no-candidates">No candidates for this position yet</p>
@@ -470,12 +891,17 @@ const AdminDashboard = () => {
                     positionCandidates.map((candidate) => (
                       <div
                         key={candidate.id}
-                        className={`candidate-item ${candidate.rank === 1 ? 'first-place' : ''}`}
+                        className={`candidate-item ${candidate.rank === 1 ? 'first-place' : ''} ${candidate.manuallySelectedWinner ? 'manually-selected' : ''}`}
                       >
                         <div className={`candidate-rank ${candidate.rank === 1 ? 'first' : 'other'}`}>
                           #{candidate.rank}
                         </div>
-                        <div className="candidate-name">{candidate.name}</div>
+                        <div className="candidate-name">
+                          {candidate.name}
+                          {candidate.manuallySelectedWinner && (
+                            <span className="manual-winner-badge">⚠️ Manually Selected</span>
+                          )}
+                        </div>
                         <div className="candidate-votes">{candidate.voteCount} votes</div>
                         <div className="vote-bar">
                           <div

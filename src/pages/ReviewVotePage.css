@@ -156,20 +156,18 @@
 .review-actions-container {
   position: fixed;
   bottom: 100px;
-  left: 0;
-  right: 0;
-  padding: 0 20px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 999;
-  display: flex;
-  justify-content: center;
   pointer-events: none;
+  width: auto;
 }
 
 .review-btn-submit {
   background: #2563eb;
   color: white;
   border: none;
-  padding: 16px 48px;
+  padding: 16px 120px;
   border-radius: 50px;
   font-size: 16px;
   font-weight: 700;
@@ -178,10 +176,9 @@
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  max-width: 600px;
   width: auto;
-  min-width: 400px;
   pointer-events: auto;
+  white-space: nowrap;
 }
 
 .review-btn-submit:hover:not(:disabled) {
@@ -358,9 +355,8 @@
   }
 
   .review-btn-submit {
-    padding: 14px 32px;
+    padding: 14px 100px;
     font-size: 14px;
-    min-width: 300px;
   }
 
   .review-confirm-modal-content {
@@ -380,7 +376,6 @@
   }
 
   .review-btn-submit {
-    min-width: 250px;
-    padding: 12px 24px;
+    padding: 12px 80px;
   }
 }

@@ -18,7 +18,7 @@
   width: 48px;
   height: 48px;
   border: 4px solid #e5e7eb;
-  border-top-color: #2563eb;
+  border-top-color: #08479D;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 16px;
@@ -119,7 +119,7 @@
 }
 
 .profile-btn-receipt {
-  background: #2563eb;
+  background: #08479D;
   color: white;
   padding: 12px 24px;
   border-radius: 8px;
@@ -131,9 +131,9 @@
 }
 
 .profile-btn-receipt:hover {
-  background: #1d4ed8;
+  background: #063a7d;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 12px rgba(8, 71, 157, 0.3);
 }
 
 /* Account Information */
@@ -183,14 +183,14 @@
 }
 
 .profile-btn-primary {
-  background: #2563eb;
+  background: #08479D;
   color: white;
 }
 
 .profile-btn-primary:hover {
-  background: #1d4ed8;
+  background: #063a7d;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 12px rgba(8, 71, 157, 0.3);
 }
 
 .profile-btn-logout {
@@ -326,8 +326,8 @@
 
 .profile-input:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: #08479D;
+  box-shadow: 0 0 0 3px rgba(8, 71, 157, 0.1);
 }
 
 .profile-modal-actions {
@@ -354,12 +354,12 @@
 
 .profile-btn-submit {
   flex: 1;
-  background: #2563eb;
+  background: #08479D;
   color: white;
 }
 
 .profile-btn-submit:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: #063a7d;
 }
 
 /* Receipt Modal */
@@ -469,8 +469,8 @@
 }
 
 .receipt-vote-card {
-  background: #eff6ff;
-  border: 2px solid #bfdbfe;
+  background: #e8f0f7;
+  border: 2px solid #b3d1e8;
   border-radius: 10px;
   padding: 14px;
 }
@@ -478,7 +478,7 @@
 .receipt-position-name {
   font-size: 15px;
   font-weight: 700;
-  color: #1e40af;
+  color: #08479D;
   margin: 0 0 10px 0;
 }
 
@@ -539,7 +539,7 @@
 
 .receipt-btn-close {
   width: 100%;
-  background: #1e40af;
+  background: #08479D;
   color: white;
   padding: 14px 24px;
   border-radius: 10px;
@@ -552,9 +552,9 @@
 }
 
 .receipt-btn-close:hover {
-  background: #1e3a8a;
+  background: #063a7d;
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(30, 64, 175, 0.4);
+  box-shadow: 0 8px 20px rgba(8, 71, 157, 0.4);
 }
 
 .receipt-btn-close:active {

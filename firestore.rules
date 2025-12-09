@@ -21,8 +21,20 @@ service cloud.firestore {
     
     // Admins collection
     match /admins/{adminId} {
-      allow read: if request.auth != null && request.auth.uid == adminId;
-      allow write: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      // Admins can read their own data and all other admins
+      allow read: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      
+      // Allow creating admin document:
+      // 1. For the authenticated user themselves (for new admin setup)
+      // 2. By superadmins (for creating other admin accounts)
+      allow create: if request.auth != null && (
+        request.auth.uid == adminId ||
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'superadmin'
+      );
+      
+      // Only superadmins can update/delete admin documents
+      allow update, delete: if request.auth != null && 
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'superadmin';
     }
     
     // Elections collection

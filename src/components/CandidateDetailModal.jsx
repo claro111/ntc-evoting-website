@@ -66,6 +66,11 @@ const CandidateDetailModal = ({ candidate, isOpen, onClose }) => {
           <div className="modal-info">
             <h2 className="modal-candidate-name">{candidate.name}</h2>
             <p className="modal-candidate-position">{candidate.position}</p>
+            {candidate.school && (
+              <p className="modal-candidate-school">
+                <span className="school-label">School:</span> {candidate.school}
+              </p>
+            )}
             {candidate.partylist && (
               <p className="modal-candidate-partylist">
                 <span className="partylist-label">Partylist:</span> {candidate.partylist}
@@ -74,11 +79,21 @@ const CandidateDetailModal = ({ candidate, isOpen, onClose }) => {
           </div>
 
           {candidate.bio && (
-            <div className="modal-platform">
-              <h3 className="platform-title">Platform</h3>
+            <div className="modal-section">
+              <h3 className="section-title">Bio</h3>
               <div
-                className="platform-content"
+                className="section-content"
                 dangerouslySetInnerHTML={{ __html: candidate.bio }}
+              />
+            </div>
+          )}
+
+          {candidate.platform && (
+            <div className="modal-section">
+              <h3 className="section-title">Platform</h3>
+              <div
+                className="section-content"
+                dangerouslySetInnerHTML={{ __html: candidate.platform }}
               />
             </div>
           )}

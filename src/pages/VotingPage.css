@@ -62,25 +62,11 @@
   -webkit-overflow-scrolling: touch;
   display: block;
   width: 100%;
-  scrollbar-width: thin;
-  scrollbar-color: #d1d5db #f3f4f6;
+  scrollbar-width: none;
 }
 
 .voting-position-tabs-container::-webkit-scrollbar {
-  height: 4px;
-}
-
-.voting-position-tabs-container::-webkit-scrollbar-track {
-  background: #f3f4f6;
-}
-
-.voting-position-tabs-container::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 2px;
-}
-
-.voting-position-tabs-container::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  display: none;
 }
 
 .voting-position-tabs {
@@ -89,7 +75,7 @@
   margin: 0 auto;
   padding: 0 20px;
   gap: 0;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: none;
   width: fit-content;
   min-width: 100%;
   justify-content: center;
@@ -201,7 +187,7 @@
 .voting-position-label {
   font-size: 14px;
   font-weight: 700;
-  color: #2563eb;
+  color: #002d6d;
   margin: 0 0 16px 0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -341,20 +327,18 @@
 .voting-review-button-container {
   position: fixed;
   bottom: 100px;
-  left: 0;
-  right: 0;
-  padding: 0 20px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 999;
-  display: flex;
-  justify-content: center;
   pointer-events: none;
+  width: auto;
 }
 
 .voting-btn-review {
   background: white;
   color: #2563eb;
   border: 2px solid #2563eb;
-  padding: 16px 48px;
+  padding: 16px 120px;
   border-radius: 50px;
   font-size: 16px;
   font-weight: 700;
@@ -363,14 +347,13 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  max-width: 600px;
   width: auto;
-  min-width: 400px;
   pointer-events: auto;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  white-space: nowrap;
 }
 
 .voting-btn-review:hover:not(:disabled) {
@@ -499,6 +482,13 @@
 .voting-modal-position {
   margin: 0;
   font-size: 16px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.voting-modal-school {
+  margin: 8px 0 0 0;
+  font-size: 15px;
   color: #6b7280;
   font-weight: 500;
 }
@@ -658,7 +648,7 @@
   }
 
   .voting-progress-container {
-    margin-top: 80px;
+    margin-top: 120px;
     padding: 0 12px;
   }
 
@@ -743,13 +733,11 @@
 
   .voting-review-button-container {
     bottom: 90px;
-    padding: 0 12px;
   }
 
   .voting-btn-review {
-    padding: 14px 32px;
+    padding: 14px 100px;
     font-size: 14px;
-    min-width: 280px;
   }
 
   .vote-count-badge {
@@ -811,7 +799,7 @@
   }
 
   .voting-progress-container {
-    margin-top: 70px;
+    margin-top: 110px;
     padding: 0 8px;
   }
 
@@ -911,13 +899,11 @@
 
   .voting-review-button-container {
     bottom: 80px;
-    padding: 0 8px;
   }
 
   .voting-btn-review {
-    padding: 12px 24px;
+    padding: 12px 80px;
     font-size: 13px;
-    min-width: 240px;
   }
 
   .vote-count-badge {
@@ -972,7 +958,7 @@
 
 @media (max-width: 375px) {
   .voting-progress-container {
-    margin-top: 65px;
+    margin-top: 105px;
   }
 
   .progress-step span {
@@ -1203,4 +1189,74 @@
   .results-bar {
     grid-column: 1 / -1;
   }
+}
+
+/* Abstain Feature */
+.voting-abstain-container {
+  margin: 20px 0;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 2px dashed #d1d5db;
+}
+
+.voting-btn-abstain {
+  width: 100%;
+  padding: 14px 24px;
+  background: white;
+  border: 2px solid #9ca3af;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.voting-btn-abstain:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #6b7280;
+  transform: translateY(-1px);
+}
+
+.voting-btn-abstain:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.voting-btn-abstain.abstained {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.voting-btn-abstain.abstained:hover:not(:disabled) {
+  background: #fde68a;
+}
+
+.abstain-note {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 13px;
+  color: #92400e;
+  font-weight: 500;
+}
+
+.voting-candidates-list.abstained {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.voting-candidate-card.disabled {
+  opacity: 0.5;
+}
+
+.voting-candidate-card.disabled .voting-btn-vote {
+  cursor: not-allowed;
 }
