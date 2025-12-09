@@ -196,10 +196,9 @@ const AnnouncementPage = () => {
                   <h3 className="announcement-card-title">
                     {announcement.title}
                   </h3>
-                  <div 
-                    className="announcement-card-description"
-                    dangerouslySetInnerHTML={{ __html: announcement.description }}
-                  />
+                  <p className="announcement-card-description">
+                    {announcement.description.replace(/<[^>]*>/g, '')}
+                  </p>
                 </div>
               </div>
             ))}

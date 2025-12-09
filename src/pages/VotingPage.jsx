@@ -5,6 +5,8 @@ import { db, auth } from '../config/firebase';
 import Logo from '../components/Logo';
 import FloatingBottomNavbar from '../components/FloatingBottomNavbar';
 import FloatingCountdownTimer from '../components/FloatingCountdownTimer';
+import Toast from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 import './VotingPage.css';
 
 const VotingPage = () => {
@@ -22,6 +24,7 @@ const VotingPage = () => {
   const [hasVoted, setHasVoted] = useState(false);
   const [resultsPublished, setResultsPublished] = useState(false);
   const [voterSchool, setVoterSchool] = useState('');
+  const { toast, showToast, hideToast } = useToast();
 
   useEffect(() => {
     // Check if user has already voted and get voter's school
@@ -150,6 +153,9 @@ const VotingPage = () => {
           // Add if not at max
           if (currentSelections.length < maxSelection) {
             newVotes[positionKey] = [...currentSelections, candidate.id];
+          } else {
+            // Show toast when trying to select more than allowed
+            showToast(`You can only select up to ${maxSelection} candidate${maxSelection > 1 ? 's' : ''} for ${positionKey}`, 'warning');
           }
         }
       }
@@ -593,6 +599,15 @@ const VotingPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={hideToast}
+        />
       )}
     </div>
   );

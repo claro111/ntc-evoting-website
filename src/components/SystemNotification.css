@@ -1,8 +1,10 @@
 .system-notification {
   position: fixed;
   top: 20px;
-  left: 50%;
-  transform: translateX(-50%) translateY(-120%);
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  transform: translateY(-120%);
   z-index: 10000;
   max-width: 600px;
   width: 90%;
@@ -13,15 +15,15 @@
 }
 
 .system-notification.show {
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(0);
 }
 
 @keyframes slideDown {
   from {
-    transform: translateX(-50%) translateY(-120%);
+    transform: translateY(-120%);
   }
   to {
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
   }
 }
 
