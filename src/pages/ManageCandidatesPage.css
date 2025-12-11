@@ -245,8 +245,9 @@
 }
 
 .candidate-photo {
-  width: 320px;
-  height: 380px;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 4/5;
   border-radius: 16px;
   overflow: hidden;
   background: #e5e7eb;
@@ -255,13 +256,15 @@
   justify-content: center;
   margin: 0 auto 16px auto;
   border: 2px solid #d1d5db;
+  position: relative;
 }
 
 .candidate-photo img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center;
+  object-position: center center;
+  display: block;
 }
 
 .photo-placeholder {
@@ -612,4 +615,16 @@
   border-radius: 8px;
   font-size: 14px;
   margin-top: 10px;
+}
+/* Responsive candidate photo adjustments */
+@media (max-width: 768px) {
+  .candidate-photo {
+    max-width: 250px;
+  }
+}
+
+@media (max-width: 480px) {
+  .candidate-photo {
+    max-width: 200px;
+  }
 }
