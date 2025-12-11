@@ -1,12 +1,20 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './FloatingCountdownTimer.css';
 
 const FloatingCountdownTimer = ({ targetDate, votingStatus }) => {
+  const navigate = useNavigate();
   const [timeRemaining, setTimeRemaining] = useState({
     hours: 0,
     minutes: 0,
     seconds: 0,
   });
+
+  const handleClick = () => {
+    if (votingStatus === 'active') {
+      navigate('/voter/voting');
+    }
+  };
 
   useEffect(() => {
     if (!targetDate) return;
@@ -63,7 +71,10 @@ const FloatingCountdownTimer = ({ targetDate, votingStatus }) => {
   }
 
   return (
-    <div className="floating-countdown-timer">
+    <div 
+      className={`floating-countdown-timer ${votingStatus === 'active' ? 'clickable' : ''}`}
+      onClick={handleClick}
+    >
       <div className="countdown-header">VOTE NOW</div>
       <div className="countdown-display">
         <span className="countdown-time">

@@ -5,16 +5,19 @@ service firebase.storage {
     // Helper function to check if user is admin
     function isAdmin() {
       return request.auth != null &&
-             firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data.role in ['admin', 'super_admin'];
+             firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data.role in ['admin', 'superadmin', 'super_admin', 'moderator'];
     }
     
     // Verification documents
     match /verification_docs/{voterId}/{fileName} {
-      // Allow upload during registration (anyone can upload to their own folder)
-      allow create: if request.auth == null || request.auth.uid == voterId;
+      // Allow upload during registration (unauthenticated users or users uploading to their own folder)
+      allow create: if request.auth == null || (request.auth != null && request.auth.uid == voterId);
       
       // Admins can read verification documents
       allow read: if isAdmin();
+      
+      // Users can read their own verification documents
+      allow read: if request.auth != null && request.auth.uid == voterId;
       
       // No one can update or delete verification documents
       allow update, delete: if false;
@@ -26,6 +29,15 @@ service firebase.storage {
       allow read: if request.auth != null;
       
       // Only admins can upload/update/delete candidate photos
+      allow write: if isAdmin();
+    }
+    
+    // Announcement attachments
+    match /announcement_attachments/{announcementId}/{fileName} {
+      // Anyone authenticated can read announcement attachments
+      allow read: if request.auth != null;
+      
+      // Only admins can upload/update/delete announcement attachments
       allow write: if isAdmin();
     }
   }

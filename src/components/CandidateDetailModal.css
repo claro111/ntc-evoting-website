@@ -1,94 +1,77 @@
+/* Updated modal styles - v3.0 - FORCE ABOVE NAVBAR */
 .modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  padding: 20px;
-  animation: fadeIn 0.3s ease;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background: rgba(0, 0, 0, 0.7) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 99999 !important;
+  padding: 10px !important;
+  padding-bottom: 140px !important;
+  overflow-y: auto !important;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.modal-container {
-  background: white;
-  border-radius: 16px;
-  max-width: 543px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-  animation: slideUp 0.3s ease;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
-}
-
-.modal-container::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+.modal-content {
+  background: white !important;
+  border-radius: 16px !important;
+  max-width: 800px !important;
+  width: 92% !important;
+  max-height: calc(100vh - 160px) !important;
+  position: relative !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin: auto !important;
 }
 
 .modal-close-button {
   position: absolute;
   top: 16px;
   right: 16px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: white;
+  background: rgba(0, 0, 0, 0.1);
   border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 20px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 10;
-  transition: all 0.2s ease;
+  transition: all 0.3s;
+  z-index: 1;
+  color: #6b7280;
 }
 
 .modal-close-button:hover {
-  background: #f3f4f6;
-  transform: scale(1.1);
+  background: rgba(0, 0, 0, 0.2);
+  color: #1f2937;
 }
 
-.close-icon {
-  width: 24px;
-  height: 24px;
-  color: #374151;
-}
-
-.modal-content {
-  padding: 24px;
+.modal-header {
+  background: white;
+  color: #1f2937;
+  padding: 40px 24px 24px;
+  text-align: center;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .modal-photo-container {
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 20px;
-  overflow: hidden;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
+  overflow: hidden;
+  margin: 0 auto 16px;
+  border: 4px solid #2563eb;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
 .modal-candidate-photo {
@@ -100,43 +83,46 @@
 .modal-photo-placeholder {
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   display: flex;
   align-items: center;
   justify-content: center;
+  background: #2563eb;
+  color: white;
+  font-size: 40px;
+  font-weight: bold;
 }
 
 .modal-candidate-initials {
-  font-size: 48px;
-  font-weight: 700;
+  font-size: 40px;
+  font-weight: bold;
   color: white;
 }
 
-.modal-info {
-  text-align: center;
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
 .modal-candidate-name {
-  font-size: 28px;
+  margin: 0 0 8px 0;
+  font-size: 24px;
   font-weight: 700;
   color: #1f2937;
-  margin-bottom: 8px;
+  text-align: center;
+  width: 100%;
 }
 
 .modal-candidate-position {
-  font-size: 18px;
-  font-weight: 600;
-  color: #3b82f6;
-  margin-bottom: 8px;
+  margin: 0;
+  font-size: 16px;
+  color: #6b7280;
+  font-weight: 500;
+  text-align: center;
+  width: 100%;
 }
 
 .modal-candidate-school {
-  font-size: 16px;
+  margin: 8px 0 0 0;
+  font-size: 15px;
   color: #6b7280;
-  margin-bottom: 4px;
+  font-weight: 500;
+  text-align: center;
+  width: 100%;
 }
 
 .school-label {
@@ -145,8 +131,9 @@
 }
 
 .modal-candidate-partylist {
-  font-size: 16px;
+  font-size: 15px;
   color: #6b7280;
+  font-weight: 500;
 }
 
 .partylist-label {
@@ -154,22 +141,40 @@
   color: #374151;
 }
 
+.modal-body {
+  padding: 24px 40px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
 .modal-section {
-  text-align: left;
   margin-bottom: 20px;
 }
 
+.modal-section:last-child {
+  margin-bottom: 0;
+}
+
 .section-title {
+  color: #2563eb;
   font-size: 18px;
   font-weight: 700;
-  color: #2563eb;
   margin: 0 0 12px 0;
 }
 
 .section-content {
-  font-size: 15px;
-  line-height: 1.6;
   color: #374151;
+  line-height: 1.6;
+  font-size: 15px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  width: 100%;
+  box-sizing: border-box;
+  columns: auto;
+  column-gap: 40px;
+  text-align: justify;
 }
 
 .section-content p {
@@ -188,7 +193,6 @@
 
 .section-content li {
   margin-bottom: 8px;
-  color: #374151;
 }
 
 .section-content strong {
@@ -196,36 +200,42 @@
   color: #2563eb;
 }
 
-.section-content em {
+.no-info {
+  text-align: center;
+  color: #9ca3af;
   font-style: italic;
+  padding: 20px;
+  font-size: 15px;
 }
 
 /* Responsive design */
+@media (max-width: 1024px) {
+  .modal-overlay {
+    padding: 15px;
+    padding-bottom: 130px;
+  }
+  
+  .modal-content {
+    max-width: 750px;
+    width: 90%;
+    max-height: calc(100vh - 145px);
+  }
+}
+
 @media (max-width: 768px) {
   .modal-overlay {
-    padding: 0;
-    align-items: flex-end;
-  }
-
-  .modal-container {
-    max-width: 100%;
-    width: 100%;
-    max-height: 95vh;
-    border-radius: 16px 16px 0 0;
+    padding: 12px;
+    padding-bottom: 120px;
   }
 
   .modal-content {
-    padding: 20px 16px;
+    max-width: 92%;
+    width: 92%;
+    max-height: calc(100vh - 132px);
   }
 
-  .modal-photo-container {
-    width: 80px;
-    height: 80px;
-    margin-bottom: 16px;
-  }
-
-  .modal-candidate-initials {
-    font-size: 32px;
+  .modal-header {
+    padding: 32px 20px 20px;
   }
 
   .modal-candidate-name {
@@ -236,59 +246,42 @@
     font-size: 14px;
   }
 
-  .modal-candidate-school,
-  .modal-candidate-partylist {
-    font-size: 13px;
+  .modal-photo-container {
+    width: 80px;
+    height: 80px;
   }
 
-  .modal-info {
-    margin-bottom: 16px;
-    padding-bottom: 16px;
+  .modal-candidate-initials {
+    font-size: 32px;
+  }
+
+  .modal-body {
+    padding: 20px;
   }
 
   .section-title {
     font-size: 16px;
-    margin-bottom: 10px;
   }
 
   .section-content {
     font-size: 14px;
   }
-
-  .modal-section {
-    margin-bottom: 16px;
-  }
-
-  .modal-close-button {
-    top: 12px;
-    right: 12px;
-    width: 36px;
-    height: 36px;
-  }
-
-  .close-icon {
-    width: 20px;
-    height: 20px;
-  }
 }
 
 @media (max-width: 480px) {
-  .modal-container {
-    max-height: 98vh;
+  .modal-overlay {
+    padding: 10px;
+    padding-bottom: 110px;
   }
-
+  
   .modal-content {
-    padding: 16px 12px;
+    max-width: 95%;
+    width: 95%;
+    max-height: calc(100vh - 120px);
   }
 
-  .modal-photo-container {
-    width: 70px;
-    height: 70px;
-    margin-bottom: 12px;
-  }
-
-  .modal-candidate-initials {
-    font-size: 28px;
+  .modal-header {
+    padding: 28px 16px 16px;
   }
 
   .modal-candidate-name {
@@ -299,39 +292,38 @@
     font-size: 13px;
   }
 
-  .modal-candidate-school,
-  .modal-candidate-partylist {
-    font-size: 12px;
+  .modal-photo-container {
+    width: 70px;
+    height: 70px;
   }
 
-  .modal-info {
-    margin-bottom: 12px;
-    padding-bottom: 12px;
+  .modal-candidate-initials {
+    font-size: 28px;
+  }
+
+  .modal-body {
+    padding: 16px;
   }
 
   .section-title {
     font-size: 15px;
-    margin-bottom: 8px;
   }
 
   .section-content {
     font-size: 13px;
   }
+}
 
-  .modal-section {
-    margin-bottom: 12px;
+@media (max-width: 375px) {
+  .modal-overlay {
+    padding: 8px;
+    padding-bottom: 100px;
   }
-
-  .modal-close-button {
-    top: 10px;
-    right: 10px;
-    width: 32px;
-    height: 32px;
-  }
-
-  .close-icon {
-    width: 18px;
-    height: 18px;
+  
+  .modal-content {
+    max-width: 98%;
+    width: 98%;
+    max-height: calc(100vh - 108px);
   }
 }
 

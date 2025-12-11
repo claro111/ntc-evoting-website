@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Verification Document Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .debug-section {
+            background: #f5f5f5;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+            padding: 5px;
+        }
+        .voter-list {
+            margin-top: 20px;
+        }
+        .voter-item {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .doc-link {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .doc-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>Debug Verification Document Upload</h1>
+    
+    <div class="debug-section">
+        <h3>Test File Upload</h3>
+        <input type="file" id="testFile" accept="image/*,application/pdf,.doc,.docx">
+        <button onclick="testUpload()">Test Upload</button>
+        <div id="uploadResult"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>Check Voters with Documents</h3>
+        <button onclick="checkVoters()">Load Voters</button>
+        <div id="votersList"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>Firebase Storage Rules Test</h3>
+        <button onclick="testStorageRules()">Test Storage Access</button>
+        <div id="storageResult"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+        import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        // Firebase config (you'll need to replace with your actual config)
+        const firebaseConfig = {
+            // Add your Firebase config here
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+        const auth = getAuth(app);
+
+        // Make functions global
+        window.testUpload = async function() {
+            const fileInput = document.getElementById('testFile');
+            const resultDiv = document.getElementById('uploadResult');
+            
+            if (!fileInput.files[0]) {
+                resultDiv.innerHTML = '<div class="error">Please select a file first</div>';
+                return;
+            }
+
+            try {
+                resultDiv.innerHTML = '<div>Uploading...</div>';
+                
+                const file = fileInput.files[0];
+                const testVoterId = 'test_voter_' + Date.now();
+                
+                // Test upload
+                const fileName = `${Date.now()}_${file.name}`;
+                const storageRef = ref(storage, `verification_docs/${testVoterId}/${fileName}`);
+                
+                const snapshot = await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <strong>Upload Successful!</strong><br>
+                        File: ${file.name}<br>
+                        Size: ${(file.size / 1024 / 1024).toFixed(2)} MB<br>
+                        URL: <a href="${downloadURL}" target="_blank" class="doc-link">View Document</a>
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Upload error:', error);
+                resultDiv.innerHTML = `<div class="error">Upload failed: ${error.message}</div>`;
+            }
+        };
+
+        window.checkVoters = async function() {
+            const resultDiv = document.getElementById('votersList');
+            
+            try {
+                resultDiv.innerHTML = '<div>Loading voters...</div>';
+                
+                const votersRef = collection(db, 'voters');
+                const snapshot = await getDocs(votersRef);
+                
+                let votersHtml = '<div class="voter-list">';
+                let count = 0;
+                
+                snapshot.forEach((doc) => {
+                    const voter = doc.data();
+                    const hasDoc = voter.verificationDocUrl ? 'Yes' : 'No';
+                    const docLink = voter.verificationDocUrl ? 
+                        `<a href="${voter.verificationDocUrl}" target="_blank" class="doc-link">View Document</a>` : 
+                        'No document';
+                    
+                    votersHtml += `
+                        <div class="voter-item">
+                            <strong>${voter.fullName || 'Unknown'}</strong> (${voter.studentId || 'No ID'})<br>
+                            Status: ${voter.status || 'Unknown'}<br>
+                            Has Document: ${hasDoc}<br>
+                            Document: ${docLink}<br>
+                            Email: ${voter.email || 'No email'}
+                        </div>
+                    `;
+                    count++;
+                });
+                
+                votersHtml += '</div>';
+                
+                resultDiv.innerHTML = `
+                    <div class="success">Found ${count} voters</div>
+                    ${votersHtml}
+                `;
+                
+            } catch (error) {
+                console.error('Error loading voters:', error);
+                resultDiv.innerHTML = `<div class="error">Failed to load voters: ${error.message}</div>`;
+            }
+        };
+
+        window.testStorageRules = async function() {
+            const resultDiv = document.getElementById('storageResult');
+            
+            try {
+                resultDiv.innerHTML = '<div>Testing storage rules...</div>';
+                
+                // Try to access storage
+                const testRef = ref(storage, 'test/test.txt');
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        Storage access successful!<br>
+                        Storage rules are properly configured.
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Storage rules error:', error);
+                resultDiv.innerHTML = `<div class="error">Storage rules test failed: ${error.message}</div>`;
+            }
+        };
+
+        // Initialize
+        console.log('Debug page loaded');
+    </script>
+</body>
+</html>
+</script>
+</body>
+</html>

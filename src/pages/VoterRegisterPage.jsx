@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { registerVoter } from '../services/authService';
+import FileUpload from '../components/FileUpload';
+import FileUploadService from '../services/fileUploadService';
 import './VoterRegisterPage.css';
 
 const VoterRegisterPage = () => {
@@ -21,6 +23,24 @@ const VoterRegisterPage = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [verificationFile, setVerificationFile] = useState(null);
+
+  // Debug function to track file selection
+  const handleFileSelect = (file) => {
+    console.log('File selected in handleFileSelect:', file);
+    console.log('File details:', file ? {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified
+    } : 'No file');
+    setVerificationFile(file);
+    
+    // Clear any previous errors when file is selected
+    if (file && error) {
+      setError('');
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -32,10 +52,46 @@ const VoterRegisterPage = () => {
   };
 
   const validateForm = () => {
-    if (!formData.firstName || !formData.lastName || !formData.birthdate || 
-        !formData.studentId || !formData.yearLevel || !formData.school ||
-        !formData.email || !formData.password || !formData.confirmPassword) {
-      setError('Please fill in all required fields');
+    // Check each field individually for better error messages
+    if (!formData.firstName) {
+      setError('First Name is required');
+      return false;
+    }
+    if (!formData.lastName) {
+      setError('Last Name is required');
+      return false;
+    }
+    if (!formData.birthdate) {
+      setError('Birthdate is required');
+      return false;
+    }
+    if (!formData.studentId) {
+      setError('Student ID is required');
+      return false;
+    }
+    if (!formData.yearLevel) {
+      setError('Year Level is required');
+      return false;
+    }
+    if (!formData.school) {
+      setError('School is required');
+      return false;
+    }
+    if (!formData.email) {
+      setError('Email is required');
+      return false;
+    }
+    if (!formData.password) {
+      setError('Password is required');
+      return false;
+    }
+    if (!formData.confirmPassword) {
+      setError('Confirm Password is required');
+      return false;
+    }
+
+    if (!verificationFile) {
+      setError('Please upload a verification document');
       return false;
     }
 
@@ -74,6 +130,10 @@ const VoterRegisterPage = () => {
     setError('');
     setLoading(true);
 
+    // Debug: Log form data and file
+    console.log('Form data:', formData);
+    console.log('Verification file:', verificationFile);
+
     if (!validateForm()) {
       setLoading(false);
       return;
@@ -82,7 +142,18 @@ const VoterRegisterPage = () => {
     try {
       const fullName = `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim();
       
-      await registerVoter({
+      console.log('Starting voter registration process...');
+      console.log('Registration data:', {
+        fullName,
+        studentId: formData.studentId,
+        email: formData.email,
+        yearLevel: formData.yearLevel,
+        school: formData.school
+      });
+      
+      // First register the voter to get the user ID
+      console.log('Calling registerVoter function...');
+      const registrationResult = await registerVoter({
         fullName,
         studentId: formData.studentId,
         birthdate: formData.birthdate,
@@ -91,12 +162,69 @@ const VoterRegisterPage = () => {
         email: formData.email,
         password: formData.password
       });
+      
+      console.log('Registration result:', registrationResult);
+
+      // Upload verification document using the voter ID
+      let verificationDocUrl = '';
+      if (verificationFile && registrationResult.voterId) {
+        try {
+          console.log('Starting verification document upload...');
+          console.log('File details:', {
+            name: verificationFile.name,
+            size: verificationFile.size,
+            type: verificationFile.type
+          });
+          console.log('Voter ID:', registrationResult.voterId);
+          
+          // Add a small delay to ensure authentication is propagated
+          console.log('Waiting for authentication to propagate...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          verificationDocUrl = await FileUploadService.uploadVerificationDocument(
+            verificationFile, 
+            registrationResult.voterId
+          );
+          
+          console.log('Upload successful, URL:', verificationDocUrl);
+          
+          // Update the voter record with the verification document URL
+          const { updateDoc, doc } = await import('firebase/firestore');
+          const { db } = await import('../config/firebase');
+          
+          const updateData = {
+            verificationDocUrl: verificationDocUrl,
+            verificationDocName: verificationFile.name,
+            updatedAt: new Date()
+          };
+          
+          console.log('Updating voter record with:', updateData);
+          
+          await updateDoc(doc(db, 'voters', registrationResult.voterId), updateData);
+          
+          console.log('Verification document uploaded and voter updated successfully');
+        } catch (uploadError) {
+          console.error('Error uploading verification document:', uploadError);
+          setError('Registration successful, but document upload failed. Please contact admin.');
+          // Continue with registration even if upload fails
+        }
+      } else {
+        console.log('No verification file or voter ID:', {
+          hasFile: !!verificationFile,
+          voterId: registrationResult.voterId
+        });
+      }
 
       alert('Registration successful! Your account is pending admin approval. You will receive an email once approved.');
       navigate('/voter/login');
 
     } catch (err) {
       console.error('Registration error:', err);
+      console.error('Error details:', {
+        code: err.code,
+        message: err.message,
+        stack: err.stack
+      });
       
       if (err.code === 'auth/email-already-in-use') {
         setError('This email is already registered');
@@ -104,6 +232,10 @@ const VoterRegisterPage = () => {
         setError('Invalid email address');
       } else if (err.code === 'auth/weak-password') {
         setError('Password is too weak. Please use a stronger password');
+      } else if (err.code === 'permission-denied') {
+        setError('Permission denied. Please check your account permissions.');
+      } else if (err.message && err.message.includes('Missing or insufficient permissions')) {
+        setError('Database permission error. Please contact administrator.');
       } else {
         setError(err.message || 'Registration failed. Please try again');
       }
@@ -318,15 +450,15 @@ const VoterRegisterPage = () => {
           <div className="form-group">
             <label className="upload-label">Upload Verification Document</label>
             <p className="upload-description">Document (Image/PDF) - Required</p>
-            <div className="upload-box">
-              <button type="button" className="upload-button">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                Choose File
-              </button>
-              <span className="upload-status">No File selected</span>
-            </div>
+            <FileUpload
+              onFileSelect={handleFileSelect}
+              accept="image/*,application/pdf,.doc,.docx"
+              maxSize={10 * 1024 * 1024}
+              placeholder="Upload verification document"
+              uploadType="document"
+              showPreview={false}
+              currentFile={verificationFile}
+            />
           </div>
 
           {/* Error Message */}

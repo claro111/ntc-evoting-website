@@ -16,16 +16,15 @@ const CandidateCard = ({ candidate, showVoteButton = false, onVote, isSelected =
       <div className="p-4">
         <div className="flex items-center gap-4">
           {/* Candidate Photo */}
-          <div className="flex-shrink-0">
+          <div className="candidate-photo">
             {candidate.photoUrl ? (
               <img
                 src={candidate.photoUrl}
                 alt={candidate.name}
-                className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
               />
             ) : (
-              <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
-                <span className="text-gray-500 text-2xl font-bold">
+              <div className="candidate-photo-placeholder">
+                <span>
                   {candidate.name?.charAt(0) || '?'}
                 </span>
               </div>

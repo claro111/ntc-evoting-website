@@ -53,7 +53,7 @@ const AdminLayout = () => {
   // Define all menu items with required roles
   const allMenuItems = [
     { name: 'Dashboard', path: '/admin/dashboard', roles: ['superadmin', 'moderator'] },
-    { name: 'Manage Voters', path: '/admin/manage-voters', roles: ['superadmin', 'moderator'] },
+    { name: 'Manage Voters', path: '/admin/manage-voters', roles: ['superadmin'] },
     { name: 'Manage Candidates', path: '/admin/manage-candidates', roles: ['superadmin', 'moderator'] },
     { name: 'Voting Control', path: '/admin/voting-control', roles: ['superadmin'] },
     { name: 'Announcements', path: '/admin/announcements', roles: ['superadmin', 'moderator'] },

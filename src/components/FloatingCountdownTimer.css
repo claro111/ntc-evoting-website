@@ -11,6 +11,22 @@
   border-radius: 0 0 30px 30px;
   /* Rounded bottom corners */
   max-width: fit-content;
+  transition: all 0.3s ease;
+}
+
+.floating-countdown-timer.clickable {
+  cursor: pointer;
+}
+
+.floating-countdown-timer.clickable:hover {
+  background: #0a5bb8;
+  transform: translateX(-50%) translateY(2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.floating-countdown-timer.clickable:active {
+  transform: translateX(-50%) translateY(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .countdown-header {

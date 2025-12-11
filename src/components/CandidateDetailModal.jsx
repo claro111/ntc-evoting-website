@@ -29,24 +29,12 @@ const CandidateDetailModal = ({ candidate, isOpen, onClose }) => {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close-button" onClick={onClose} aria-label="Close modal">
-          <svg
-            className="close-icon"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
+          ✕
         </button>
 
-        <div className="modal-content">
+        <div className="modal-header">
           <div className="modal-photo-container">
             {candidate.photoUrl ? (
               <img
@@ -62,22 +50,14 @@ const CandidateDetailModal = ({ candidate, isOpen, onClose }) => {
               </div>
             )}
           </div>
+          <h2 className="modal-candidate-name">{candidate.name}</h2>
+          <p className="modal-candidate-position">{candidate.position}</p>
+          {candidate.school && (
+            <p className="modal-candidate-school">School: {candidate.school}</p>
+          )}
+        </div>
 
-          <div className="modal-info">
-            <h2 className="modal-candidate-name">{candidate.name}</h2>
-            <p className="modal-candidate-position">{candidate.position}</p>
-            {candidate.school && (
-              <p className="modal-candidate-school">
-                <span className="school-label">School:</span> {candidate.school}
-              </p>
-            )}
-            {candidate.partylist && (
-              <p className="modal-candidate-partylist">
-                <span className="partylist-label">Partylist:</span> {candidate.partylist}
-              </p>
-            )}
-          </div>
-
+        <div className="modal-body">
           {candidate.bio && (
             <div className="modal-section">
               <h3 className="section-title">Bio</h3>
@@ -96,6 +76,10 @@ const CandidateDetailModal = ({ candidate, isOpen, onClose }) => {
                 dangerouslySetInnerHTML={{ __html: candidate.platform }}
               />
             </div>
+          )}
+
+          {!candidate.bio && !candidate.platform && (
+            <p className="no-info">No additional information available.</p>
           )}
         </div>
       </div>

@@ -99,6 +99,10 @@ const ReviewVotePage = () => {
     setShowConfirmDialog(false);
   };
 
+  const handleBackToVoting = () => {
+    navigate('/voter/voting');
+  };
+
   const handleSubmitVote = async () => {
     try {
       setSubmitting(true);
@@ -181,7 +185,7 @@ const ReviewVotePage = () => {
           <div className="progress-fill" style={{ width: '66.66%' }}></div>
         </div>
         <div className="review-progress-steps">
-          <div className="progress-step completed">
+          <div className="progress-step completed clickable" onClick={handleBackToVoting}>
             <span>SELECT</span>
           </div>
           <div className="progress-step active">
@@ -192,6 +196,8 @@ const ReviewVotePage = () => {
           </div>
         </div>
       </div>
+
+
 
       {/* Warning Banner */}
       <div className="review-warning-banner">

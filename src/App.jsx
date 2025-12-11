@@ -24,6 +24,8 @@ import ManageAnnouncementsPage from './pages/ManageAnnouncementsPage';
 import ManageAdminsPage from './pages/ManageAdminsPage';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import ProtectedVoterRoute from './components/ProtectedVoterRoute';
+import ProtectedRoute from './components/ProtectedRoute';
+import './components/ProtectedRoute.css';
 
 function App() {
   return (
@@ -56,13 +58,41 @@ function App() {
           
           {/* Admin App Routes with Layout */}
           <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>
-            <Route path="dashboard" element={<AdminDashboard />} />
-            <Route path="archive" element={<ArchiveResultsPage />} />
-            <Route path="manage-voters" element={<ManageVotersPage />} />
-            <Route path="manage-candidates" element={<ManageCandidatesPage />} />
-            <Route path="voting-control" element={<VotingControlPage />} />
-            <Route path="announcements" element={<ManageAnnouncementsPage />} />
-            <Route path="manage-admins" element={<ManageAdminsPage />} />
+            <Route path="dashboard" element={
+              <ProtectedRoute requiredRoles={['superadmin', 'moderator']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="archive" element={
+              <ProtectedRoute requiredRoles={['superadmin', 'moderator']}>
+                <ArchiveResultsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="manage-voters" element={
+              <ProtectedRoute requiredRoles={['superadmin']}>
+                <ManageVotersPage />
+              </ProtectedRoute>
+            } />
+            <Route path="manage-candidates" element={
+              <ProtectedRoute requiredRoles={['superadmin', 'moderator']}>
+                <ManageCandidatesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="voting-control" element={
+              <ProtectedRoute requiredRoles={['superadmin']}>
+                <VotingControlPage />
+              </ProtectedRoute>
+            } />
+            <Route path="announcements" element={
+              <ProtectedRoute requiredRoles={['superadmin', 'moderator']}>
+                <ManageAnnouncementsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="manage-admins" element={
+              <ProtectedRoute requiredRoles={['superadmin']}>
+                <ManageAdminsPage />
+              </ProtectedRoute>
+            } />
           </Route>
           
           {/* 404 Route */}

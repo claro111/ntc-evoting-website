@@ -5,6 +5,7 @@ import { approveVoter, rejectVoter } from '../services/voterService';
 import Toast from '../components/Toast';
 import InputConfirmDialog from '../components/InputConfirmDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
+import DocumentViewerModal from '../components/DocumentViewerModal';
 import { useToast } from '../hooks/useToast';
 import { useInputConfirm } from '../hooks/useInputConfirm';
 import { useConfirm } from '../hooks/useConfirm';
@@ -26,6 +27,8 @@ const ManageVotersPage = () => {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
   const { toast, showToast, hideToast } = useToast();
   const { confirmDialog, showInputConfirm } = useInputConfirm();
   const { confirmState, showConfirm } = useConfirm();
@@ -73,6 +76,24 @@ const ManageVotersPage = () => {
   const handleDeleteSuccess = async () => {
     // No need to refresh - real-time listeners will update automatically
     handleCloseDeleteModal();
+  };
+
+  const handleViewDocument = (voter) => {
+    if (voter.verificationDocUrl) {
+      setSelectedDocument({
+        url: voter.verificationDocUrl,
+        name: voter.verificationDocName || 'Verification Document',
+        voterName: voter.fullName
+      });
+      setShowDocumentModal(true);
+    } else {
+      showToast('No verification document available', 'warning');
+    }
+  };
+
+  const handleCloseDocumentModal = () => {
+    setShowDocumentModal(false);
+    setSelectedDocument(null);
   };
 
   useEffect(() => {
@@ -294,6 +315,7 @@ const ManageVotersPage = () => {
             voters={filterVoters(pendingVoters)} 
             formatDate={formatDate}
             onReviewClick={handleReviewClick}
+            onViewDocument={handleViewDocument}
           />
         )}
         {activeTab === 'registered' && (
@@ -310,6 +332,7 @@ const ManageVotersPage = () => {
             formatDate={formatDate}
             showToast={showToast}
             showConfirm={showConfirm}
+            showInputConfirm={showInputConfirm}
           />
         )}
       </div>
@@ -322,6 +345,8 @@ const ManageVotersPage = () => {
           onSuccess={handleApproveReject}
           showToast={showToast}
           showInputConfirm={showInputConfirm}
+          showConfirm={showConfirm}
+          onViewDocument={handleViewDocument}
         />
       )}
 
@@ -382,12 +407,23 @@ const ManageVotersPage = () => {
           onCancel={confirmDialog.onCancel}
         />
       )}
+
+      {/* Document Viewer Modal */}
+      {showDocumentModal && selectedDocument && (
+        <DocumentViewerModal
+          isOpen={showDocumentModal}
+          onClose={handleCloseDocumentModal}
+          documentUrl={selectedDocument.url}
+          documentName={selectedDocument.name}
+          voterName={selectedDocument.voterName}
+        />
+      )}
     </div>
   );
 };
 
 // Pending Reviews Tab Component
-const PendingReviewsTab = ({ voters, formatDate, onReviewClick }) => {
+const PendingReviewsTab = ({ voters, formatDate, onReviewClick, onViewDocument }) => {
   if (voters.length === 0) {
     return (
       <div className="empty-state">
@@ -434,7 +470,12 @@ const PendingReviewsTab = ({ voters, formatDate, onReviewClick }) => {
             </div>
           </div>
           <div className="voter-actions">
-            <button className="btn-secondary">View Document</button>
+            <button 
+              className="btn-secondary" 
+              onClick={() => onViewDocument(voter)}
+            >
+              View Document
+            </button>
             <button className="btn-primary" onClick={() => onReviewClick(voter)}>Review</button>
           </div>
         </div>
@@ -523,11 +564,9 @@ const RegisteredVotersTab = ({ voters, formatDate, onEditClick, onDeleteClick })
 };
 
 // Deactivated Voters Tab Component
-const DeactivatedVotersTab = ({ voters, formatDate, showToast, showConfirm }) => {
+const DeactivatedVotersTab = ({ voters, formatDate, showToast, showConfirm, showInputConfirm }) => {
   const [reactivating, setReactivating] = useState(null);
   const [deleting, setDeleting] = useState(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedVoter, setSelectedVoter] = useState(null);
 
   const handleReactivate = async (voter) => {
     const confirmed = await showConfirm({
@@ -577,23 +616,27 @@ const DeactivatedVotersTab = ({ voters, formatDate, showToast, showConfirm }) =>
     }
   };
 
-  const handleDeletePermanently = (voter) => {
-    setSelectedVoter(voter);
-    setShowDeleteModal(true);
-  };
+  const handleDeletePermanently = async (voter) => {
+    const confirmed = await showInputConfirm({
+      title: 'Permanently Delete Voter',
+      message: `Are you sure you want to permanently delete ${voter.fullName}?`,
+      subtitle: 'This action cannot be undone. All voter data will be permanently removed from the system.',
+      confirmWord: 'DELETE',
+      placeholder: 'Type DELETE to confirm',
+      warningText: 'This will permanently remove all voter data and cannot be reversed.'
+    });
 
-  const confirmDeletePermanently = async () => {
-    if (!selectedVoter) return;
+    if (!confirmed) {
+      return;
+    }
 
     try {
-      setDeleting(selectedVoter.id);
+      setDeleting(voter.id);
 
-      const voterRef = doc(db, 'voters', selectedVoter.id);
+      const voterRef = doc(db, 'voters', voter.id);
       await deleteDoc(voterRef);
       
-      showToast(`${selectedVoter.fullName} has been permanently deleted from the system.`, 'success');
-      setShowDeleteModal(false);
-      setSelectedVoter(null);
+      showToast(`${voter.fullName} has been permanently deleted from the system.`, 'success');
       
       // No need to refresh - real-time listeners will update automatically
     } catch (err) {
@@ -602,6 +645,8 @@ const DeactivatedVotersTab = ({ voters, formatDate, showToast, showConfirm }) =>
       setDeleting(null);
     }
   };
+
+
 
   if (voters.length === 0) {
     return (
@@ -675,78 +720,13 @@ const DeactivatedVotersTab = ({ voters, formatDate, showToast, showConfirm }) =>
         ))}
       </div>
 
-      {/* Permanent Delete Confirmation Modal */}
-      {showDeleteModal && selectedVoter && (
-        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title">Permanently Delete Voter</h2>
-              <button className="modal-close" onClick={() => setShowDeleteModal(false)}>
-                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
 
-            <div className="modal-body">
-              <div className="delete-warning">
-                <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-                <h3>⚠️ WARNING: This action cannot be undone!</h3>
-                <p className="voter-name-delete">{selectedVoter.fullName}</p>
-                <p className="voter-id-delete">Student ID: {selectedVoter.studentId}</p>
-              </div>
-
-              <div className="delete-info">
-                <p><strong>This will permanently:</strong></p>
-                <ul>
-                  <li>Remove all voter information from the database</li>
-                  <li>Delete their account completely</li>
-                  <li>This action CANNOT be reversed</li>
-                  <li>Vote records (if any) may be affected</li>
-                </ul>
-                <p style={{ color: 'red', fontWeight: 'bold', marginTop: '1rem' }}>
-                  Are you absolutely sure you want to proceed?
-                </p>
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button
-                className="btn-reject"
-                onClick={confirmDeletePermanently}
-                disabled={deleting === selectedVoter.id}
-              >
-                {deleting === selectedVoter.id ? 'Deleting...' : 'Confirm Delete'}
-              </button>
-              <button
-                className="btn-cancel"
-                onClick={() => setShowDeleteModal(false)}
-                disabled={deleting === selectedVoter.id}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };
 
 // Review Registration Modal Component
-const ReviewRegistrationModal = ({ voter, onClose, onSuccess, showToast, showInputConfirm }) => {
+const ReviewRegistrationModal = ({ voter, onClose, onSuccess, showToast, showInputConfirm, showConfirm, onViewDocument }) => {
   const [expirationDate, setExpirationDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -767,12 +747,8 @@ const ReviewRegistrationModal = ({ voter, onClose, onSuccess, showToast, showInp
     });
   };
 
-  const handleViewDocument = () => {
-    if (voter.verificationDocumentUrl) {
-      window.open(voter.verificationDocumentUrl, '_blank');
-    } else {
-      showToast('No verification document available', 'warning');
-    }
+  const handleViewDocumentLocal = () => {
+    onViewDocument(voter);
   };
 
   const handleApprove = async () => {
@@ -811,22 +787,20 @@ const ReviewRegistrationModal = ({ voter, onClose, onSuccess, showToast, showInp
   };
 
   const handleReject = async () => {
-    const reason = await showInputConfirm({
+    console.log('handleReject called, showConfirm:', showConfirm);
+    
+    const confirmed = await showConfirm({
       title: 'Reject Registration',
-      message: 'Are you sure you want to reject this voter registration?',
-      subtitle: voter.fullName,
-      warningItems: [
-        'The voter will be moved to deactivated status',
-        'They will not be able to log in',
-        'A rejection notification email will be sent',
-        'This action can be reversed by reactivating the voter'
-      ],
-      confirmWord: 'REJECT',
-      placeholder: 'REJECT',
-      confirmButtonText: 'Reject Registration'
+      message: `Are you sure you want to reject ${voter.fullName}'s registration?`,
+      warningText: 'The voter will be moved to deactivated status and cannot log in. A rejection notification email will be sent. This action can be reversed by reactivating the voter.',
+      confirmText: 'Reject',
+      cancelText: 'Cancel',
+      type: 'warning'
     });
+    
+    console.log('showConfirm result:', confirmed);
 
-    if (!reason) {
+    if (!confirmed) {
       return;
     }
 
@@ -894,7 +868,7 @@ const ReviewRegistrationModal = ({ voter, onClose, onSuccess, showToast, showInp
               </div>
             </div>
 
-            <button className="btn-view-document" onClick={handleViewDocument}>
+            <button className="btn-view-document" onClick={handleViewDocumentLocal}>
               <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
@@ -939,13 +913,6 @@ const ReviewRegistrationModal = ({ voter, onClose, onSuccess, showToast, showInp
             disabled={loading}
           >
             {loading ? 'Processing...' : '✕ Reject'}
-          </button>
-          <button
-            className="btn-cancel"
-            onClick={onClose}
-            disabled={loading}
-          >
-            Cancel
           </button>
         </div>
       </div>

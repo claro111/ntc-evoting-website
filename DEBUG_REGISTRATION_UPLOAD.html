@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Registration File Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .debug-container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .file-upload-area {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: #fafafa;
+            min-height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 10px 0;
+        }
+        .file-upload-area:hover {
+            border-color: #3b82f6;
+            background-color: #f0f9ff;
+        }
+        .file-upload-area.drag-active {
+            border-color: #3b82f6;
+            background-color: #dbeafe;
+            transform: scale(1.02);
+        }
+        .file-input-hidden {
+            display: none;
+        }
+        .upload-prompt {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .upload-icon {
+            font-size: 48px;
+            opacity: 0.6;
+        }
+        .upload-text {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            text-align: center;
+        }
+        .upload-primary {
+            font-size: 16px;
+            font-weight: 600;
+            color: #374151;
+            margin: 0;
+        }
+        .upload-secondary {
+            font-size: 14px;
+            color: #6b7280;
+            margin: 0;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .test-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h1>🔧 Debug Registration File Upload</h1>
+        <p>This page helps debug the file upload issue on the registration page.</p>
+
+        <!-- Test 1: Basic File Input -->
+        <div class="test-section">
+            <h3>Test 1: Basic HTML File Input</h3>
+            <input type="file" id="basicFile" accept="image/*,application/pdf,.doc,.docx">
+            <button class="test-button" onclick="testBasicInput()">Test Basic Input</button>
+            <div id="basic-status"></div>
+        </div>
+
+        <!-- Test 2: Drag and Drop Area -->
+        <div class="test-section">
+            <h3>Test 2: Drag and Drop Area</h3>
+            <div class="file-upload-area" id="dropArea">
+                <input type="file" id="dropFile" class="file-input-hidden" accept="image/*,application/pdf,.doc,.docx">
+                <div class="upload-prompt">
+                    <div class="upload-icon">📄</div>
+                    <div class="upload-text">
+                        <p class="upload-primary">Upload verification document</p>
+                        <p class="upload-secondary">Drag and drop or click to browse</p>
+                        <p class="upload-secondary">Max size: 10MB</p>
+                    </div>
+                </div>
+            </div>
+            <div id="drop-status"></div>
+        </div>
+
+        <!-- Test 3: File Validation -->
+        <div class="test-section">
+            <h3>Test 3: File Validation Test</h3>
+            <input type="file" id="validationFile" accept="image/*,application/pdf,.doc,.docx">
+            <button class="test-button" onclick="testValidation()">Test Validation</button>
+            <div id="validation-status"></div>
+        </div>
+
+        <!-- Test 4: Registration Form Simulation -->
+        <div class="test-section">
+            <h3>Test 4: Registration Form Simulation</h3>
+            <form id="testForm">
+                <div style="margin-bottom: 15px;">
+                    <label>First Name:</label>
+                    <input type="text" name="firstName" style="width: 100%; padding: 8px; margin-top: 5px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label>Email:</label>
+                    <input type="email" name="email" style="width: 100%; padding: 8px; margin-top: 5px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label>Verification Document:</label>
+                    <input type="file" id="formFile" accept="image/*,application/pdf,.doc,.docx" style="width: 100%; padding: 8px; margin-top: 5px;">
+                </div>
+                <button type="button" class="test-button" onclick="testFormSubmission()">Test Form Submission</button>
+            </form>
+            <div id="form-status"></div>
+        </div>
+
+        <!-- Troubleshooting Guide -->
+        <div class="test-section">
+            <h3>🔍 Troubleshooting Steps</h3>
+            <div class="info">
+                <h4>If file upload is not working:</h4>
+                <ol>
+                    <li><strong>Check Browser Console:</strong> Press F12 and look for JavaScript errors</li>
+                    <li><strong>Test Basic Input:</strong> Use Test 1 above to see if basic file input works</li>
+                    <li><strong>Check File Types:</strong> Ensure you're uploading supported files (PDF, images, Word docs)</li>
+                    <li><strong>Check File Size:</strong> Ensure file is under 10MB</li>
+                    <li><strong>Clear Browser Cache:</strong> Hard refresh (Ctrl+F5) or clear cache</li>
+                    <li><strong>Try Different Browser:</strong> Test in Chrome, Firefox, or Edge</li>
+                    <li><strong>Check Network:</strong> Ensure stable internet connection</li>
+                </ol>
+                
+                <h4>Common Issues:</h4>
+                <ul>
+                    <li><strong>Component Not Rendering:</strong> Check if FileUpload.jsx and FileUpload.css exist</li>
+                    <li><strong>CSS Conflicts:</strong> Check if upload area is hidden by other styles</li>
+                    <li><strong>JavaScript Errors:</strong> Check browser console for errors</li>
+                    <li><strong>Import Issues:</strong> Verify FileUpload component is properly imported</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Test 1: Basic File Input
+        function testBasicInput() {
+            const fileInput = document.getElementById('basicFile');
+            const statusDiv = document.getElementById('basic-status');
+            
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                statusDiv.innerHTML = `
+                    <div class="success">
+                        ✅ File selected successfully!<br>
+                        <strong>Name:</strong> ${file.name}<br>
+                        <strong>Size:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB<br>
+                        <strong>Type:</strong> ${file.type}
+                    </div>
+                `;
+            } else {
+                statusDiv.innerHTML = '<div class="error">❌ No file selected. Please select a file first.</div>';
+            }
+        }
+
+        // Test 2: Drag and Drop
+        const dropArea = document.getElementById('dropArea');
+        const dropFile = document.getElementById('dropFile');
+        const dropStatus = document.getElementById('drop-status');
+
+        dropArea.addEventListener('click', () => dropFile.click());
+
+        dropArea.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dropArea.classList.add('drag-active');
+        });
+
+        dropArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('drag-active');
+        });
+
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('drag-active');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                dropStatus.innerHTML = `
+                    <div class="success">
+                        ✅ File dropped successfully!<br>
+                        <strong>Name:</strong> ${file.name}<br>
+                        <strong>Size:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB<br>
+                        <strong>Type:</strong> ${file.type}
+                    </div>
+                `;
+            }
+        });
+
+        dropFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                dropStatus.innerHTML = `
+                    <div class="success">
+                        ✅ File selected via click!<br>
+                        <strong>Name:</strong> ${file.name}<br>
+                        <strong>Size:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB<br>
+                        <strong>Type:</strong> ${file.type}
+                    </div>
+                `;
+            }
+        });
+
+        // Test 3: File Validation
+        function testValidation() {
+            const fileInput = document.getElementById('validationFile');
+            const statusDiv = document.getElementById('validation-status');
+            
+            if (fileInput.files.length === 0) {
+                statusDiv.innerHTML = '<div class="error">❌ Please select a file first.</div>';
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+
+            let validationResults = [];
+
+            // Size validation
+            if (file.size > maxSize) {
+                validationResults.push('❌ File too large (max 10MB)');
+            } else {
+                validationResults.push('✅ File size OK');
+            }
+
+            // Type validation
+            if (allowedTypes.includes(file.type)) {
+                validationResults.push('✅ File type supported');
+            } else {
+                validationResults.push('❌ File type not supported');
+            }
+
+            const isValid = !validationResults.some(result => result.includes('❌'));
+            const statusClass = isValid ? 'success' : 'error';
+
+            statusDiv.innerHTML = `
+                <div class="${statusClass}">
+                    <strong>File:</strong> ${file.name}<br>
+                    <strong>Size:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB<br>
+                    <strong>Type:</strong> ${file.type}<br>
+                    <strong>Validation Results:</strong><br>
+                    ${validationResults.join('<br>')}
+                </div>
+            `;
+        }
+
+        // Test 4: Form Submission
+        function testFormSubmission() {
+            const form = document.getElementById('testForm');
+            const fileInput = document.getElementById('formFile');
+            const statusDiv = document.getElementById('form-status');
+            
+            const formData = new FormData(form);
+            
+            if (fileInput.files.length > 0) {
+                formData.append('verificationFile', fileInput.files[0]);
+                
+                statusDiv.innerHTML = `
+                    <div class="success">
+                        ✅ Form data prepared successfully!<br>
+                        <strong>Form Fields:</strong><br>
+                        - First Name: ${formData.get('firstName') || 'Not filled'}<br>
+                        - Email: ${formData.get('email') || 'Not filled'}<br>
+                        - File: ${fileInput.files[0].name}<br>
+                        <strong>Ready for submission!</strong>
+                    </div>
+                `;
+            } else {
+                statusDiv.innerHTML = '<div class="error">❌ Please select a verification document.</div>';
+            }
+        }
+    </script>
+</body>
+</html>

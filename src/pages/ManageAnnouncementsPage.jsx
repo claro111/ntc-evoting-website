@@ -5,19 +5,24 @@ import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
+import FileUpload from '../components/FileUpload';
+import FileUploadService from '../services/fileUploadService';
 import { useToast } from '../hooks/useToast';
 import { useConfirm } from '../hooks/useConfirm';
+import { usePermissions } from '../hooks/usePermissions';
 import './ManageAnnouncementsPage.css';
 
 const ManageAnnouncementsPage = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [attachmentFile, setAttachmentFile] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const { toast, showToast, hideToast } = useToast();
   const { confirmState, showConfirm } = useConfirm();
+  const { userRole, canCreate, canEdit, canDelete } = usePermissions();
 
   useEffect(() => {
     // Set up real-time listener for announcements
@@ -47,6 +52,7 @@ const ManageAnnouncementsPage = () => {
   const handleClearForm = () => {
     setTitle('');
     setDescription('');
+    setAttachmentFile(null);
     setEditingId(null);
   };
 
@@ -65,24 +71,50 @@ const ManageAnnouncementsPage = () => {
     try {
       setSubmitting(true);
 
+      let attachmentUrl = '';
+      let attachmentName = '';
+
+      // Upload attachment if provided
+      if (attachmentFile) {
+        const tempId = editingId || `temp_${Date.now()}`;
+        attachmentUrl = await FileUploadService.uploadAnnouncementAttachment(attachmentFile, tempId);
+        attachmentName = attachmentFile.name;
+      }
+
       if (editingId) {
         // Update existing announcement
         const announcementRef = doc(db, 'announcements', editingId);
-        await updateDoc(announcementRef, {
+        const updateData = {
           title: title.trim(),
           description: description,
           updatedAt: Timestamp.now(),
-        });
+        };
+
+        // Only update attachment if new file was uploaded
+        if (attachmentFile) {
+          updateData.attachmentUrl = attachmentUrl;
+          updateData.attachmentName = attachmentName;
+        }
+
+        await updateDoc(announcementRef, updateData);
         showToast('Announcement updated successfully!', 'success');
       } else {
         // Create new announcement
-        await addDoc(collection(db, 'announcements'), {
+        const announcementData = {
           title: title.trim(),
           description: description,
           isActive: true,
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
-        });
+        };
+
+        // Add attachment data if file was uploaded
+        if (attachmentFile) {
+          announcementData.attachmentUrl = attachmentUrl;
+          announcementData.attachmentName = attachmentName;
+        }
+
+        await addDoc(collection(db, 'announcements'), announcementData);
         showToast('Announcement posted successfully!', 'success');
       }
 
@@ -175,10 +207,11 @@ const ManageAnnouncementsPage = () => {
       </div>
 
       {/* Create/Edit Announcement Form */}
-      <div className="announcement-form-section">
-        <h2 className="section-title">
-          {editingId ? 'Edit Announcement' : 'Create New Announcement'}
-        </h2>
+      {canCreate('announcements') && (
+        <div className="announcement-form-section">
+          <h2 className="section-title">
+            {editingId ? 'Edit Announcement' : 'Create New Announcement'}
+          </h2>
         
         <div className="form-group">
           <label className="form-label">Title:</label>
@@ -200,6 +233,18 @@ const ManageAnnouncementsPage = () => {
             modules={modules}
             formats={formats}
             placeholder="Enter announcement description..."
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Attachment (Optional):</label>
+          <FileUpload
+            onFileSelect={setAttachmentFile}
+            accept="*/*"
+            maxSize={25 * 1024 * 1024}
+            placeholder="Upload attachment (PDF, images, documents, etc.)"
+            uploadType="any"
+            showPreview={false}
           />
         </div>
 
@@ -229,7 +274,8 @@ const ManageAnnouncementsPage = () => {
             </button>
           )}
         </div>
-      </div>
+        </div>
+      )}
 
       {/* Posted Announcements */}
       <div className="announcements-list-section">
@@ -261,35 +307,52 @@ const ManageAnnouncementsPage = () => {
                   dangerouslySetInnerHTML={{ __html: announcement.description }}
                 />
 
+                {announcement.attachmentUrl && (
+                  <div className="announcement-attachment">
+                    <a 
+                      href={announcement.attachmentUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="attachment-link"
+                    >
+                      📎 {announcement.attachmentName || 'Download Attachment'}
+                    </a>
+                  </div>
+                )}
+
                 <div className="announcement-actions">
-                  <button
-                    className="btn-edit"
-                    onClick={() => handleEditAnnouncement(announcement)}
-                  >
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    </svg>
-                    Edit
-                  </button>
-                  <button
-                    className="btn-delete"
-                    onClick={() => handleDeleteAnnouncement(announcement.id)}
-                  >
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                    Delete
-                  </button>
+                  {canEdit('announcements') && (
+                    <button
+                      className="btn-edit"
+                      onClick={() => handleEditAnnouncement(announcement)}
+                    >
+                      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        />
+                      </svg>
+                      Edit
+                    </button>
+                  )}
+                  {canDelete('announcements') && (
+                    <button
+                      className="btn-delete"
+                      onClick={() => handleDeleteAnnouncement(announcement.id)}
+                    >
+                      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

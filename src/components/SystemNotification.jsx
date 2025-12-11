@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './SystemNotification.css';
 
 const SystemNotification = ({ isVisible, type, title, message, onClose, duration = 8000 }) => {
+  const navigate = useNavigate();
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -22,6 +24,13 @@ const SystemNotification = ({ isVisible, type, title, message, onClose, duration
     setTimeout(() => {
       if (onClose) onClose();
     }, 300); // Wait for animation to complete
+  };
+
+  const handleClick = () => {
+    if (type === 'voting-started') {
+      navigate('/voter/voting');
+      handleClose(); // Close notification after navigation
+    }
   };
 
   if (!isVisible && !show) return null;
@@ -50,7 +59,10 @@ const SystemNotification = ({ isVisible, type, title, message, onClose, duration
   };
 
   return (
-    <div className={`system-notification ${type} ${show ? 'show' : ''}`}>
+    <div 
+      className={`system-notification ${type} ${show ? 'show' : ''} ${type === 'voting-started' ? 'clickable' : ''}`}
+      onClick={handleClick}
+    >
       <div className="notification-content">
         <div className="notification-icon">
           {getIcon()}
@@ -62,7 +74,13 @@ const SystemNotification = ({ isVisible, type, title, message, onClose, duration
             <p className="notification-message">{message.split('\n')[1]}</p>
           )}
         </div>
-        <button className="notification-close" onClick={handleClose}>
+        <button 
+          className="notification-close" 
+          onClick={(e) => {
+            e.stopPropagation(); // Prevent triggering the notification click
+            handleClose();
+          }}
+        >
           ✕
         </button>
       </div>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Fix Verification Documents</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .section { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Quick Fix for Verification Documents</h1>
+    
+    <div class="section">
+        <h3>Instructions:</h3>
+        <ol>
+            <li>Open your browser's Developer Tools (F12)</li>
+            <li>Go to the Console tab</li>
+            <li>Copy and paste the script below into the console</li>
+            <li>Press Enter to run it</li>
+        </ol>
+    </div>
+
+    <div class="section">
+        <h3>Script to Copy:</h3>
+        <pre id="script">
+// Quick fix for verification documents
+(async function fixDocs() {
+  try {
+    console.log('🔧 Starting verification document fix...');
+    
+    // Import Firebase functions
+    const { collection, getDocs, doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+    const { ref, listAll, getDownloadURL } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js');
+    
+    // Get Firebase instances (assuming they're already initialized)
+    const db = window.db || firebase.firestore();
+    const storage = window.storage || firebase.storage();
+    
+    // Get all voters
+    const votersSnapshot = await getDocs(collection(db, 'voters'));
+    console.log(`📊 Found ${votersSnapshot.size} voters`);
+    
+    let fixed = 0;
+    let alreadyHasDoc = 0;
+    let errors = 0;
+    
+    for (const docSnap of votersSnapshot.docs) {
+      const voter = docSnap.data();
+      const voterId = docSnap.id;
+      
+      console.log(`👤 Checking: ${voter.fullName} (${voter.studentId})`);
+      
+      // Skip if already has document URL
+      if (voter.verificationDocUrl) {
+        console.log(`  ✅ Already has document`);
+        alreadyHasDoc++;
+        continue;
+      }
+      
+      try {
+        // Check storage for files
+        const storageRef = ref(storage, `verification_docs/${voterId}`);
+        const listResult = await listAll(storageRef);
+        
+        if (listResult.items.length > 0) {
+          const fileRef = listResult.items[0];
+          const downloadURL = await getDownloadURL(fileRef);
+          
+          // Update voter document
+          await updateDoc(doc(db, 'voters', voterId), {
+            verificationDocUrl: downloadURL,
+            verificationDocName: fileRef.name,
+            updatedAt: new Date()
+          });
+          
+          console.log(`  ✅ Fixed: ${voter.fullName}`);
+          fixed++;
+        } else {
+          console.log(`  ⚠️ No file in storage for ${voter.fullName}`);
+        }
+      } catch (error) {
+        console.error(`  ❌ Error fixing ${voter.fullName}:`, error);
+        errors++;
+      }
+    }
+    
+    console.log('\n🎉 FIX COMPLETE!');
+    console.log(`📊 Total voters: ${votersSnapshot.size}`);
+    console.log(`✅ Fixed: ${fixed}`);
+    console.log(`📄 Already had docs: ${alreadyHasDoc}`);
+    console.log(`❌ Errors: ${errors}`);
+    
+  } catch (error) {
+    console.error('❌ Script error:', error);
+  }
+})();
+        </pre>
+        <button onclick="copyScript()">Copy Script</button>
+    </div>
+
+    <div class="section">
+        <h3>Alternative: Manual Check</h3>
+        <p>If the above doesn't work, try this simpler version:</p>
+        <pre id="simpleScript">
+// Simple check
+console.log('Checking Firebase...');
+console.log('DB:', typeof db !== 'undefined' ? 'Available' : 'Not found');
+console.log('Storage:', typeof storage !== 'undefined' ? 'Available' : 'Not found');
+
+// List voters
+if (typeof db !== 'undefined') {
+  db.collection('voters').get().then(snapshot => {
+    console.log(`Found ${snapshot.size} voters`);
+    snapshot.forEach(doc => {
+      const voter = doc.data();
+      console.log(`${voter.fullName}: ${voter.verificationDocUrl ? 'HAS DOC' : 'NO DOC'}`);
+    });
+  });
+}
+        </pre>
+        <button onclick="copySimpleScript()">Copy Simple Script</button>
+    </div>
+
+    <script>
+        function copyScript() {
+            const script = document.getElementById('script').textContent;
+            navigator.clipboard.writeText(script).then(() => {
+                alert('Script copied to clipboard!');
+            });
+        }
+        
+        function copySimpleScript() {
+            const script = document.getElementById('simpleScript').textContent;
+            navigator.clipboard.writeText(script).then(() => {
+                alert('Simple script copied to clipboard!');
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../config/firebase';
 import { loginVoter } from '../services/authService';
 import './VoterLoginPage.css';
 
@@ -13,6 +16,28 @@ const VoterLoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Check if user is already authenticated
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const voterDoc = await getDoc(doc(db, 'voters', user.uid));
+          if (voterDoc.exists()) {
+            const voterData = voterDoc.data();
+            if (voterData.status === 'registered' && voterData.emailVerified) {
+              // User is already logged in, redirect to home
+              navigate('/voter/home', { replace: true });
+            }
+          }
+        } catch (error) {
+          console.error('Error checking auth status:', error);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -65,7 +90,7 @@ const VoterLoginPage = () => {
       }
 
       if (voterData.status === 'registered' && voterData.emailVerified) {
-        navigate('/voter/home');
+        navigate('/voter/home', { replace: true });
       } else {
         setError('Your account is not fully verified. Please contact the administrator.');
         setLoading(false);

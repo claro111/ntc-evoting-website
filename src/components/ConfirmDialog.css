@@ -8,7 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  z-index: 99999;
   animation: fadeIn 0.2s ease;
 }
 
@@ -147,14 +147,14 @@
 }
 
 .confirm-btn-warning {
-  background: #1e3a8a;
+  background: #991b1b;
   color: white;
 }
 
 .confirm-btn-warning:hover {
-  background: #1e40af;
+  background: #7f1d1d;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+  box-shadow: 0 4px 12px rgba(153, 27, 27, 0.3);
 }
 
 .confirm-btn-info {

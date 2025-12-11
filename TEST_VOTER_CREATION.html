@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Voter Creation</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .section { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        input { margin: 5px; padding: 8px; width: 200px; }
+    </style>
+</head>
+<body>
+    <h1>Test Voter Creation</h1>
+    
+    <div class="section">
+        <h3>Manual Test</h3>
+        <p>This will test creating a voter document directly.</p>
+        
+        <input type="email" id="email" placeholder="test@ntc.edu.ph" value="test123@ntc.edu.ph">
+        <input type="password" id="password" placeholder="TestPass123!" value="TestPass123!">
+        <input type="text" id="name" placeholder="Test User" value="Test User">
+        <br>
+        <button onclick="testCreateVoter()">Test Create Voter</button>
+        <button onclick="testFirestoreRules()">Test Firestore Rules</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Add your Firebase config
+        const firebaseConfig = {
+            // Your config here
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.testCreateVoter = async function() {
+            const resultDiv = document.getElementById('result');
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const name = document.getElementById('name').value;
+
+            try {
+                resultDiv.innerHTML = '<div>Testing voter creation...</div>';
+
+                // Step 1: Create user
+                console.log('Creating user...');
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                console.log('User created:', user.uid);
+
+                // Step 2: Create voter document
+                console.log('Creating voter document...');
+                const voterData = {
+                    fullName: name,
+                    studentId: '12345',
+                    email: email,
+                    birthdate: '2000-01-01',
+                    yearLevel: '1st Year',
+                    school: 'SOB',
+                    status: 'pending',
+                    emailVerified: false,
+                    hasVoted: false,
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                };
+
+                await setDoc(doc(db, 'voters', user.uid), voterData);
+                console.log('Voter document created successfully');
+
+                // Step 3: Verify document was created
+                const voterDoc = await getDoc(doc(db, 'voters', user.uid));
+                if (voterDoc.exists()) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Success! Voter created successfully.<br>
+                            User ID: ${user.uid}<br>
+                            Document exists: Yes<br>
+                            Data: ${JSON.stringify(voterDoc.data(), null, 2)}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = '<div class="error">❌ Document was not created</div>';
+                }
+
+            } catch (error) {
+                console.error('Test failed:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ Test failed:<br>
+                        Code: ${error.code}<br>
+                        Message: ${error.message}
+                    </div>
+                `;
+            }
+        };
+
+        window.testFirestoreRules = async function() {
+            const resultDiv = document.getElementById('result');
+
+            try {
+                resultDiv.innerHTML = '<div>Testing Firestore rules...</div>';
+
+                // Test 1: Try to read without auth
+                try {
+                    await getDoc(doc(db, 'voters', 'test'));
+                    resultDiv.innerHTML += '<div class="error">❌ Unauthenticated read should fail</div>';
+                } catch (error) {
+                    resultDiv.innerHTML += '<div class="success">✅ Unauthenticated read correctly blocked</div>';
+                }
+
+                // Test 2: Check current auth state
+                const user = auth.currentUser;
+                if (user) {
+                    resultDiv.innerHTML += `<div class="success">✅ User is authenticated: ${user.email}</div>`;
+                    
+                    // Test authenticated read
+                    try {
+                        await getDoc(doc(db, 'voters', user.uid));
+                        resultDiv.innerHTML += '<div class="success">✅ Authenticated read works</div>';
+                    } catch (error) {
+                        resultDiv.innerHTML += `<div class="error">❌ Authenticated read failed: ${error.message}</div>`;
+                    }
+                } else {
+                    resultDiv.innerHTML += '<div class="error">❌ No user authenticated</div>';
+                }
+
+            } catch (error) {
+                resultDiv.innerHTML += `<div class="error">❌ Rules test failed: ${error.message}</div>`;
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import FileUploadService from '../services/fileUploadService';
+import FileUpload from '../components/FileUpload';
 import { db, storage } from '../config/firebase';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
@@ -8,6 +9,7 @@ import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useToast } from '../hooks/useToast';
 import { useConfirm } from '../hooks/useConfirm';
+import { usePermissions } from '../hooks/usePermissions';
 import './ManageCandidatesPage.css';
 
 const ManageCandidatesPage = () => {
@@ -19,6 +21,7 @@ const ManageCandidatesPage = () => {
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const { toast, showToast, hideToast } = useToast();
   const { confirmState, showConfirm } = useConfirm();
+  const { userRole, canCreate, canEdit, canDelete } = usePermissions();
   const [showPositionModal, setShowPositionModal] = useState(false);
   const [showCandidateModal, setShowCandidateModal] = useState(false);
   const [positionFilter, setPositionFilter] = useState('all');
@@ -257,12 +260,16 @@ const ManageCandidatesPage = () => {
           <p className="page-subtitle">Manage election positions and candidates</p>
         </div>
         <div className="header-buttons">
-          <button className="btn-load-sample" onClick={handleLoadSampleData}>
-            Load Sample Data
-          </button>
-          <button className="btn-reset-candidates" onClick={handleResetData}>
-            Reset All Data
-          </button>
+          {canCreate('candidates') && (
+            <button className="btn-load-sample" onClick={handleLoadSampleData}>
+              Load Sample Data
+            </button>
+          )}
+          {canDelete('candidates') && (
+            <button className="btn-reset-candidates" onClick={handleResetData}>
+              Reset All Data
+            </button>
+          )}
         </div>
       </div>
 
@@ -294,6 +301,9 @@ const ManageCandidatesPage = () => {
             onRefresh={fetchData}
             showToast={showToast}
             showConfirm={showConfirm}
+            canCreate={canCreate('candidates')}
+            canEdit={canEdit('candidates')}
+            canDelete={canDelete('candidates')}
           />
         )}
         {activeTab === 'candidates' && (
@@ -307,6 +317,9 @@ const ManageCandidatesPage = () => {
             onRefresh={fetchData}
             showToast={showToast}
             showConfirm={showConfirm}
+            canCreate={canCreate('candidates')}
+            canEdit={canEdit('candidates')}
+            canDelete={canDelete('candidates')}
           />
         )}
       </div>
@@ -365,7 +378,7 @@ const ManageCandidatesPage = () => {
 };
 
 // Positions Tab Component
-const PositionsTab = ({ positions, onAdd, onEdit, onRefresh, showToast, showConfirm }) => {
+const PositionsTab = ({ positions, onAdd, onEdit, onRefresh, showToast, showConfirm, canCreate, canEdit: canEditPerm, canDelete }) => {
   const handleDelete = async (position) => {
     const confirmed = await showConfirm({
       title: 'Delete Position',
@@ -394,9 +407,11 @@ const PositionsTab = ({ positions, onAdd, onEdit, onRefresh, showToast, showConf
     <div className="positions-tab">
       <div className="section-header">
         <h2>Manage Positions</h2>
-        <button className="btn-add" onClick={onAdd}>
-          + Add Position
-        </button>
+        {canCreate && (
+          <button className="btn-add" onClick={onAdd}>
+            + Add Position
+          </button>
+        )}
       </div>
 
       {positions.length === 0 ? (
@@ -413,12 +428,16 @@ const PositionsTab = ({ positions, onAdd, onEdit, onRefresh, showToast, showConf
                 <p>Max Selection: {position.maxSelection}</p>
               </div>
               <div className="position-actions">
-                <button className="btn-edit" onClick={() => onEdit(position)}>
-                  Edit
-                </button>
-                <button className="btn-delete" onClick={() => handleDelete(position)}>
-                  Delete
-                </button>
+                {canEditPerm && (
+                  <button className="btn-edit" onClick={() => onEdit(position)}>
+                    Edit
+                  </button>
+                )}
+                {canDelete && (
+                  <button className="btn-delete" onClick={() => handleDelete(position)}>
+                    Delete
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -429,7 +448,7 @@ const PositionsTab = ({ positions, onAdd, onEdit, onRefresh, showToast, showConf
 };
 
 // Candidates Tab Component
-const CandidatesTab = ({ candidates, positions, positionFilter, onFilterChange, onAdd, onEdit, onRefresh, showToast, showConfirm }) => {
+const CandidatesTab = ({ candidates, positions, positionFilter, onFilterChange, onAdd, onEdit, onRefresh, showToast, showConfirm, canCreate, canEdit: canEditPerm, canDelete }) => {
   const handleDelete = async (candidate) => {
     const confirmed = await showConfirm({
       title: 'Delete Candidate',
@@ -471,9 +490,11 @@ const CandidatesTab = ({ candidates, positions, positionFilter, onFilterChange, 
               </option>
             ))}
           </select>
-          <button className="btn-add" onClick={onAdd}>
-            + Add Candidate
-          </button>
+          {canCreate && (
+            <button className="btn-add" onClick={onAdd}>
+              + Add Candidate
+            </button>
+          )}
         </div>
       </div>
 
@@ -506,12 +527,16 @@ const CandidatesTab = ({ candidates, positions, positionFilter, onFilterChange, 
                       )}
                     </div>
                     <div className="candidate-actions">
-                      <button className="btn-edit" onClick={() => onEdit(candidate)}>
-                        Edit
-                      </button>
-                      <button className="btn-delete" onClick={() => handleDelete(candidate)}>
-                        Delete
-                      </button>
+                      {canEditPerm && (
+                        <button className="btn-edit" onClick={() => onEdit(candidate)}>
+                          Edit
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button className="btn-delete" onClick={() => handleDelete(candidate)}>
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -673,9 +698,11 @@ const CandidateFormModal = ({ candidate, positions, onClose, onSuccess, showToas
 
       // Upload photo if new file selected
       if (photoFile) {
-        const storageRef = ref(storage, `candidates/${Date.now()}_${photoFile.name}`);
-        await uploadBytes(storageRef, photoFile);
-        photoUrl = await getDownloadURL(storageRef);
+        photoUrl = await FileUploadService.uploadCandidatePhoto(
+          photoFile, 
+          candidate?.id || `temp_${Date.now()}`,
+          'current'
+        );
       }
 
       const candidateData = {
@@ -813,15 +840,14 @@ const CandidateFormModal = ({ candidate, positions, onClose, onSuccess, showToas
 
             <div className="form-group">
               <label className="form-label">Photo:</label>
-              <input
-                type="file"
+              <FileUpload
+                onFileSelect={setPhotoFile}
                 accept="image/*"
-                onChange={handlePhotoChange}
-                className="form-input-file"
+                maxSize={5 * 1024 * 1024}
+                placeholder="Upload candidate photo"
+                uploadType="image"
+                currentFile={candidate?.photoUrl ? { name: 'Current photo', type: 'image/jpeg' } : null}
               />
-              {candidate?.photoUrl && !photoFile && (
-                <p className="form-hint">Current photo will be kept if no new file is selected</p>
-              )}
             </div>
 
             {error && <div className="error-message">{error}</div>}

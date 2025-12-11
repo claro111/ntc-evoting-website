@@ -300,3 +300,41 @@ select.form-input option {
     font-size: 20px;
   }
 }
+/* File Upload Integration */
+.form-group .file-upload-container {
+  margin-top: 8px;
+}
+
+.form-group .file-upload-area {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #fafafa;
+  min-height: 100px;
+}
+
+.form-group .file-upload-area:hover {
+  border-color: #007bff;
+  background-color: #f0f9ff;
+}
+
+.form-group .file-upload-area.drag-active {
+  border-color: #007bff;
+  background-color: #e3f2fd;
+}
+
+/* Override upload styles for registration form */
+.upload-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.upload-description {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 8px;
+}
+
+/* Old upload styles are replaced by FileUpload component */

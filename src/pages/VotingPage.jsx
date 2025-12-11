@@ -17,7 +17,7 @@ const VotingPage = () => {
   const [abstainedPositions, setAbstainedPositions] = useState({});
   const [votingClosed, setVotingClosed] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [activePositionTab, setActivePositionTab] = useState(null);
+  const [activePositionTab, setActivePositionTab] = useState(0);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [election, setElection] = useState(null);
@@ -36,7 +36,8 @@ const VotingPage = () => {
           const voterDoc = await getDoc(voterRef);
           if (voterDoc.exists()) {
             const voterData = voterDoc.data();
-            setHasVoted(voterData.hasVoted || false);
+            const hasVotedStatus = voterData.hasVoted || false;
+            setHasVoted(hasVotedStatus);
             setVoterSchool(voterData.school || '');
           }
         } catch (error) {
@@ -45,7 +46,44 @@ const VotingPage = () => {
       }
     };
 
+    // Restore previous selections from sessionStorage
+    const restorePreviousSelections = () => {
+      const storedVotes = sessionStorage.getItem('selectedVotes');
+      const storedAbstentions = sessionStorage.getItem('abstainedPositions');
+      
+      if (storedVotes) {
+        try {
+          const selectedCandidates = JSON.parse(storedVotes);
+          const restoredVotes = {};
+          
+          // Group candidates by position
+          selectedCandidates.forEach((candidate) => {
+            const positionName = candidate.position || candidate.positionName;
+            if (!restoredVotes[positionName]) {
+              restoredVotes[positionName] = [];
+            }
+            restoredVotes[positionName].push(candidate.id);
+          });
+          
+          setSelectedVotes(restoredVotes);
+        } catch (error) {
+          console.error('Error restoring selected votes:', error);
+        }
+      }
+      
+      // Only restore abstentions if voting is still active and user hasn't voted
+      if (storedAbstentions && !hasVoted) {
+        try {
+          const abstentions = JSON.parse(storedAbstentions);
+          setAbstainedPositions(abstentions);
+        } catch (error) {
+          console.error('Error restoring abstained positions:', error);
+        }
+      }
+    };
+
     checkVotingStatus();
+    restorePreviousSelections();
   }, []);
 
   useEffect(() => {
@@ -110,6 +148,60 @@ const VotingPage = () => {
       unsubscribeElection();
     };
   }, []);
+
+  // Convert restored votes to correct format once positions are loaded
+  useEffect(() => {
+    if (positions.length > 0 && Object.keys(selectedVotes).length > 0) {
+      const correctedVotes = {};
+      
+      Object.entries(selectedVotes).forEach(([positionName, candidateIds]) => {
+        const position = positions.find(p => p.name === positionName);
+        const maxSelection = position?.maxSelection || 1;
+        
+        if (Array.isArray(candidateIds)) {
+          if (maxSelection === 1 && candidateIds.length === 1) {
+            // Convert single-item array to single value for positions with maxSelection = 1
+            correctedVotes[positionName] = candidateIds[0];
+          } else {
+            // Keep as array for positions with maxSelection > 1
+            correctedVotes[positionName] = candidateIds;
+          }
+        } else {
+          // Already a single value, keep as is
+          correctedVotes[positionName] = candidateIds;
+        }
+      });
+      
+      setSelectedVotes(correctedVotes);
+    }
+  }, [positions]);
+
+  // Monitor hasVoted status changes to detect system resets
+  useEffect(() => {
+    // Only clear selections if hasVoted changes from true to false (system reset)
+    // This prevents clearing selections during normal navigation
+    const storedHasVoted = localStorage.getItem('lastHasVotedStatus');
+    const currentHasVotedStr = hasVoted.toString();
+    
+    if (storedHasVoted === 'true' && hasVoted === false) {
+      // System was reset - clear cached selections
+      sessionStorage.removeItem('selectedVotes');
+      sessionStorage.removeItem('abstainedPositions');
+      setSelectedVotes({});
+      setAbstainedPositions({});
+      console.log('System reset detected - clearing cached selections');
+    }
+    
+    // Update stored status
+    localStorage.setItem('lastHasVotedStatus', currentHasVotedStr);
+  }, [hasVoted]);
+
+  // Clear abstained positions when voting is closed or user has already voted
+  useEffect(() => {
+    if (votingClosed || hasVoted) {
+      setAbstainedPositions({});
+    }
+  }, [votingClosed, hasVoted]);
 
   const handleVoteSelection = (candidate) => {
     if (votingClosed) return;
@@ -198,6 +290,12 @@ const VotingPage = () => {
   };
 
   const handleProceedToReview = () => {
+    // Check if user has only abstained from all positions
+    if (Object.keys(selectedVotes).length === 0 && Object.keys(abstainedPositions).length > 0) {
+      showToast('You must vote for at least one position. You cannot submit a ballot with only abstentions.', 'warning');
+      return;
+    }
+
     // Collect all selected candidate IDs from both single values and arrays
     const selectedCandidateIds = [];
     Object.values(selectedVotes).forEach(vote => {
@@ -232,10 +330,10 @@ const VotingPage = () => {
   };
 
   const getDisplayedPositions = () => {
-    if (activePositionTab === null) {
-      return positions;
+    if (activePositionTab >= 0 && activePositionTab < positions.length) {
+      return [positions[activePositionTab]];
     }
-    return [positions[activePositionTab]];
+    return positions.length > 0 ? [positions[0]] : [];
   };
 
   const getTargetDate = () => {
@@ -312,12 +410,6 @@ const VotingPage = () => {
       {/* Position Tabs */}
       <div className="voting-position-tabs-container">
         <div className="voting-position-tabs">
-          <button
-            className={`voting-position-tab ${activePositionTab === null ? 'active' : ''}`}
-            onClick={() => setActivePositionTab(null)}
-          >
-            ALL
-          </button>
           {positions.map((position, index) => (
             <button
               key={position.id}
@@ -500,13 +592,13 @@ const VotingPage = () => {
           <button 
             className="voting-btn-review" 
             onClick={handleProceedToReview}
-            disabled={Object.keys(selectedVotes).length === 0 && Object.keys(abstainedPositions).length === 0}
+            disabled={Object.keys(selectedVotes).length === 0}
           >
             Review Selections
-            {(Object.keys(selectedVotes).length > 0 || Object.keys(abstainedPositions).length > 0) && (
+            {Object.keys(selectedVotes).length > 0 && (
               <span className="vote-count-badge">
                 {(() => {
-                  // Count total selected candidates (handle both single values and arrays)
+                  // Count only selected candidates (handle both single values and arrays)
                   let totalCount = 0;
                   Object.values(selectedVotes).forEach(vote => {
                     if (Array.isArray(vote)) {
@@ -515,8 +607,6 @@ const VotingPage = () => {
                       totalCount += 1;
                     }
                   });
-                  // Add abstained positions count
-                  totalCount += Object.keys(abstainedPositions).length;
                   return totalCount;
                 })()}
               </span>
