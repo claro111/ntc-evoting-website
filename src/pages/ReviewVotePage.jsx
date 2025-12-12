@@ -10,6 +10,7 @@ import './ReviewVotePage.css';
 const ReviewVotePage = () => {
   const navigate = useNavigate();
   const [selectedCandidates, setSelectedCandidates] = useState([]);
+  const [abstainedPositions, setAbstainedPositions] = useState({});
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -18,10 +19,18 @@ const ReviewVotePage = () => {
   useEffect(() => {
     // Retrieve selected votes from sessionStorage
     const storedVotes = sessionStorage.getItem('selectedVotes');
+    const storedAbstentions = sessionStorage.getItem('abstainedPositions');
+    
     if (storedVotes) {
       setSelectedCandidates(JSON.parse(storedVotes));
-    } else {
-      // If no votes found, redirect back to voting page
+    }
+    
+    if (storedAbstentions) {
+      setAbstainedPositions(JSON.parse(storedAbstentions));
+    }
+    
+    // If no votes or abstentions found, redirect back to voting page
+    if (!storedVotes && !storedAbstentions) {
       navigate('/voter/voting');
     }
   }, [navigate]);
@@ -147,6 +156,7 @@ const ReviewVotePage = () => {
           candidateName: c.name,
           positionName: c.position || c.positionName,
         })),
+        abstainedPositions: Object.keys(abstainedPositions),
         timestamp: serverTimestamp(),
       });
 
@@ -158,6 +168,7 @@ const ReviewVotePage = () => {
 
       // Clear session storage
       sessionStorage.removeItem('selectedVotes');
+      sessionStorage.removeItem('abstainedPositions');
 
       // Navigate to confirmation page
       navigate('/voter/vote-confirmation');
@@ -218,6 +229,7 @@ const ReviewVotePage = () => {
       <div className="review-selections-section">
         <h2 className="review-selections-title">Your Selections</h2>
 
+        {/* Voted Positions */}
         {Object.entries(groupedCandidates).map(([positionName, candidates]) => (
           <div key={positionName} className="review-selection-card">
             <div className="review-selection-position-header">
@@ -231,6 +243,24 @@ const ReviewVotePage = () => {
             ))}
           </div>
         ))}
+
+        {/* Abstained Positions */}
+        {Object.keys(abstainedPositions).length > 0 && (
+          <>
+            <h3 className="review-abstained-title">Abstained Positions</h3>
+            {Object.keys(abstainedPositions).map((positionName) => (
+              <div key={positionName} className="review-selection-card abstained">
+                <div className="review-selection-position-header">
+                  <span className="review-selection-abstain-icon">⊘</span>
+                  <span className="review-selection-position-label">{positionName.toUpperCase()}</span>
+                </div>
+                <div className="review-selection-abstain-text">
+                  YOU CHOSE NOT TO VOTE FOR THIS POSITION
+                </div>
+              </div>
+            ))}
+          </>
+        )}
       </div>
 
       {/* Submit Button */}

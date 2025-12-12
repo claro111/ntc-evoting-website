@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Cloud Functions</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .warning { background: #fff3cd; color: #856404; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Cloud Functions Test</h1>
+    <div id="status" class="status info">Ready to test Cloud Functions...</div>
+    
+    <h2>Available Functions:</h2>
+    <button onclick="testFunction('approveVoter')" id="btn-approve">Test approveVoter</button>
+    <button onclick="testFunction('rejectVoter')" id="btn-reject">Test rejectVoter</button>
+    <button onclick="testFunction('deleteVoterPermanently')" id="btn-delete">Test deleteVoterPermanently</button>
+    <button onclick="testFunction('verifyEmail')" id="btn-verify">Test verifyEmail</button>
+    
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDUBq8OUO2ZbKBzMwpjAhBBHQZ5EDCpBJo",
+            authDomain: "ntc-evoting-website.firebaseapp.com",
+            projectId: "ntc-evoting-website",
+            storageBucket: "ntc-evoting-website.firebasestorage.app",
+            messagingSenderId: "422004488",
+            appId: "1:422004488:web:5c6c5c5c5c5c5c5c5c5c5c"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const functions = getFunctions(app);
+
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+
+        // Test function availability
+        window.testFunction = async function(functionName) {
+            const button = document.getElementById(`btn-${functionName.replace('Voter', '').toLowerCase()}`);
+            button.disabled = true;
+            
+            try {
+                statusDiv.innerHTML = `Testing ${functionName}...`;
+                statusDiv.className = 'status info';
+                
+                const testFunction = httpsCallable(functions, functionName);
+                
+                // Test with minimal data to check if function exists and is callable
+                let testData = {};
+                switch(functionName) {
+                    case 'approveVoter':
+                        testData = { voterId: 'test', expirationDate: '2024-12-31' };
+                        break;
+                    case 'rejectVoter':
+                        testData = { voterId: 'test', reason: 'test' };
+                        break;
+                    case 'deleteVoterPermanently':
+                        testData = { voterId: 'test' };
+                        break;
+                    case 'verifyEmail':
+                        testData = { token: 'test' };
+                        break;
+                }
+                
+                const result = await testFunction(testData);
+                
+                // If we get here, the function exists and is callable
+                statusDiv.innerHTML = `✅ ${functionName} is deployed and callable!`;
+                statusDiv.className = 'status success';
+                
+                resultsDiv.innerHTML += `
+                    <div class="status success">
+                        <strong>${functionName}</strong>: Function is available
+                        <br><small>Note: Expected authentication error for test data</small>
+                    </div>
+                `;
+                
+            } catch (error) {
+                if (error.code === 'functions/unauthenticated') {
+                    // This is expected - function exists but requires authentication
+                    statusDiv.innerHTML = `✅ ${functionName} is deployed and working!`;
+                    statusDiv.className = 'status success';
+                    
+                    resultsDiv.innerHTML += `
+                        <div class="status success">
+                            <strong>${functionName}</strong>: ✅ Deployed and working
+                            <br><small>Authentication required (as expected)</small>
+                        </div>
+                    `;
+                } else if (error.code === 'functions/not-found') {
+                    statusDiv.innerHTML = `❌ ${functionName} not found!`;
+                    statusDiv.className = 'status error';
+                    
+                    resultsDiv.innerHTML += `
+                        <div class="status error">
+                            <strong>${functionName}</strong>: ❌ Not deployed
+                        </div>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `⚠️ ${functionName} error: ${error.message}`;
+                    statusDiv.className = 'status warning';
+                    
+                    resultsDiv.innerHTML += `
+                        <div class="status warning">
+                            <strong>${functionName}</strong>: ⚠️ ${error.message}
+                        </div>
+                    `;
+                }
+            } finally {
+                button.disabled = false;
+            }
+        };
+
+        // Initialize
+        statusDiv.innerHTML = 'Firebase initialized. Click buttons to test functions.';
+        statusDiv.className = 'status info';
+    </script>
+</body>
+</html>

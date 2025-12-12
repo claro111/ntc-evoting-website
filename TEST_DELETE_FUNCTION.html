@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Delete Function</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .success { 
+            background: #d4edda; 
+            color: #155724; 
+            border-color: #28a745;
+        }
+        .error { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border-color: #dc3545;
+        }
+        .info { 
+            background: #d1ecf1; 
+            color: #0c5460; 
+            border-color: #17a2b8;
+        }
+        .warning { 
+            background: #fff3cd; 
+            color: #856404; 
+            border-color: #ffc107;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        input {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Permanent Delete Function</h1>
+    <div id="status" class="status info">This will test the permanent delete function using the Firebase SDK.</div>
+    
+    <div>
+        <h3>Admin Login</h3>
+        <input type="email" id="adminEmail" placeholder="Admin Email" value="admin@ntc.edu.ph">
+        <input type="password" id="adminPassword" placeholder="Admin Password" value="admin123">
+        <button onclick="loginAdmin()" id="loginBtn">Login as Admin</button>
+    </div>
+    
+    <div id="loginStatus"></div>
+    
+    <div id="testSection" style="display: none;">
+        <h3>Test Permanent Delete</h3>
+        <input type="text" id="testVoterId" placeholder="Enter Voter ID to delete">
+        <button onclick="testDelete()" id="deleteBtn">Test Delete Function</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDUBq8OUO2ZbKBzMwpjAhBBHQZ5EDCpBJo",
+            authDomain: "ntc-evoting-website.firebaseapp.com",
+            projectId: "ntc-evoting-website",
+            storageBucket: "ntc-evoting-website.firebasestorage.app",
+            messagingSenderId: "422004488",
+            appId: "1:422004488:web:5c6c5c5c5c5c5c5c5c5c5c"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const functions = getFunctions(app, 'us-central1');
+
+        const statusDiv = document.getElementById('status');
+        const loginStatusDiv = document.getElementById('loginStatus');
+        const resultsDiv = document.getElementById('results');
+        const testSection = document.getElementById('testSection');
+
+        window.loginAdmin = async function() {
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+            const loginBtn = document.getElementById('loginBtn');
+            
+            if (!email || !password) {
+                loginStatusDiv.innerHTML = '<div class="status warning">Please enter email and password</div>';
+                return;
+            }
+            
+            loginBtn.disabled = true;
+            loginStatusDiv.innerHTML = '<div class="status info">Logging in...</div>';
+            
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                loginStatusDiv.innerHTML = '<div class="status success">✅ Logged in successfully as admin!</div>';
+                testSection.style.display = 'block';
+                
+                // Load deactivated voters for testing
+                loadDeactivatedVoters();
+                
+            } catch (error) {
+                console.error('Login error:', error);
+                loginStatusDiv.innerHTML = `<div class="status error">❌ Login failed: ${error.message}</div>`;
+            } finally {
+                loginBtn.disabled = false;
+            }
+        };
+
+        async function loadDeactivatedVoters() {
+            try {
+                const votersRef = collection(db, 'voters');
+                const deactivatedQuery = query(votersRef, where('status', '==', 'deactivated'));
+                const snapshot = await getDocs(deactivatedQuery);
+                
+                if (!snapshot.empty) {
+                    let votersList = '<h4>Available Deactivated Voters for Testing:</h4><ul>';
+                    snapshot.docs.forEach(doc => {
+                        const voter = doc.data();
+                        votersList += `<li><strong>${voter.fullName}</strong> (${voter.email}) - ID: ${doc.id}</li>`;
+                    });
+                    votersList += '</ul>';
+                    
+                    resultsDiv.innerHTML = votersList;
+                } else {
+                    resultsDiv.innerHTML = '<div class="status info">No deactivated voters found for testing.</div>';
+                }
+            } catch (error) {
+                console.error('Error loading voters:', error);
+                resultsDiv.innerHTML = `<div class="status error">Error loading voters: ${error.message}</div>`;
+            }
+        }
+
+        window.testDelete = async function() {
+            const voterId = document.getElementById('testVoterId').value.trim();
+            const deleteBtn = document.getElementById('deleteBtn');
+            
+            if (!voterId) {
+                statusDiv.innerHTML = 'Please enter a voter ID to test deletion.';
+                statusDiv.className = 'status warning';
+                return;
+            }
+            
+            deleteBtn.disabled = true;
+            statusDiv.innerHTML = `Testing permanent deletion for voter: ${voterId}...`;
+            statusDiv.className = 'status info';
+            
+            try {
+                // Call the Cloud Function
+                const deleteVoterPermanently = httpsCallable(functions, 'deleteVoterPermanently');
+                const result = await deleteVoterPermanently({ voterId: voterId });
+                
+                if (result.data.success) {
+                    statusDiv.innerHTML = `✅ SUCCESS: ${result.data.message}`;
+                    statusDiv.className = 'status success';
+                    
+                    resultsDiv.innerHTML += `
+                        <div class="status success">
+                            <strong>Deletion Successful!</strong><br>
+                            Voter ID: ${voterId}<br>
+                            Message: ${result.data.message}<br>
+                            Time: ${new Date().toLocaleString()}
+                        </div>
+                    `;
+                    
+                    // Reload the deactivated voters list
+                    setTimeout(loadDeactivatedVoters, 2000);
+                    
+                } else {
+                    throw new Error(result.data.message || 'Unknown error');
+                }
+                
+            } catch (error) {
+                console.error('Error testing delete:', error);
+                statusDiv.innerHTML = `❌ ERROR: ${error.message}`;
+                statusDiv.className = 'status error';
+                
+                resultsDiv.innerHTML += `
+                    <div class="status error">
+                        <strong>Deletion Failed!</strong><br>
+                        Voter ID: ${voterId}<br>
+                        Error: ${error.message}<br>
+                        Time: ${new Date().toLocaleString()}
+                    </div>
+                `;
+            } finally {
+                deleteBtn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>

@@ -290,9 +290,18 @@ const VotingPage = () => {
   };
 
   const handleProceedToReview = () => {
-    // Check if user has only abstained from all positions
-    if (Object.keys(selectedVotes).length === 0 && Object.keys(abstainedPositions).length > 0) {
-      showToast('You must vote for at least one position. You cannot submit a ballot with only abstentions.', 'warning');
+    // Check if all positions have been addressed (either voted or abstained)
+    const totalPositions = positions.length;
+    const votedPositions = Object.keys(selectedVotes).length;
+    const abstainedPositionsCount = Object.keys(abstainedPositions).length;
+    const addressedPositions = votedPositions + abstainedPositionsCount;
+
+    if (addressedPositions < totalPositions) {
+      const remainingPositions = positions.filter(pos => 
+        !selectedVotes[pos.name] && !abstainedPositions[pos.name]
+      );
+      const positionNames = remainingPositions.map(pos => pos.name).join(', ');
+      showToast(`You must vote or abstain for all positions. Missing: ${positionNames}`, 'warning');
       return;
     }
 
@@ -592,25 +601,26 @@ const VotingPage = () => {
           <button 
             className="voting-btn-review" 
             onClick={handleProceedToReview}
-            disabled={Object.keys(selectedVotes).length === 0}
+            disabled={(() => {
+              const totalPositions = positions.length;
+              const votedPositions = Object.keys(selectedVotes).length;
+              const abstainedPositionsCount = Object.keys(abstainedPositions).length;
+              return (votedPositions + abstainedPositionsCount) < totalPositions;
+            })()}
           >
             Review Selections
-            {Object.keys(selectedVotes).length > 0 && (
-              <span className="vote-count-badge">
-                {(() => {
-                  // Count only selected candidates (handle both single values and arrays)
-                  let totalCount = 0;
-                  Object.values(selectedVotes).forEach(vote => {
-                    if (Array.isArray(vote)) {
-                      totalCount += vote.length;
-                    } else {
-                      totalCount += 1;
-                    }
-                  });
-                  return totalCount;
-                })()}
-              </span>
-            )}
+            {(() => {
+              const totalPositions = positions.length;
+              const votedPositions = Object.keys(selectedVotes).length;
+              const abstainedPositionsCount = Object.keys(abstainedPositions).length;
+              const addressedPositions = votedPositions + abstainedPositionsCount;
+              
+              return (
+                <span className="vote-progress-badge">
+                  {addressedPositions}/{totalPositions}
+                </span>
+              );
+            })()}
           </button>
         </div>
       )}

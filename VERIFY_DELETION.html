@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Voter Deletion</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .success { 
+            background: #d4edda; 
+            color: #155724; 
+            border-color: #28a745;
+        }
+        .error { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border-color: #dc3545;
+        }
+        .info { 
+            background: #d1ecf1; 
+            color: #0c5460; 
+            border-color: #17a2b8;
+        }
+        .warning { 
+            background: #fff3cd; 
+            color: #856404; 
+            border-color: #ffc107;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .check-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .check-icon {
+            margin-right: 10px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Verify Voter Deletion</h1>
+    <div id="status" class="status info">Enter a voter ID to verify if they were properly deleted from all systems.</div>
+    
+    <div>
+        <input type="text" id="voterIdInput" placeholder="Enter Voter ID to check" style="width: 300px;">
+        <button onclick="verifyDeletion()" id="verifyBtn">Verify Deletion</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, doc, getDoc, collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDUBq8OUO2ZbKBzMwpjAhBBHQZ5EDCpBJo",
+            authDomain: "ntc-evoting-website.firebaseapp.com",
+            projectId: "ntc-evoting-website",
+            storageBucket: "ntc-evoting-website.firebasestorage.app",
+            messagingSenderId: "422004488",
+            appId: "1:422004488:web:5c6c5c5c5c5c5c5c5c5c5c"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+
+        window.verifyDeletion = async function() {
+            const voterId = document.getElementById('voterIdInput').value.trim();
+            const button = document.getElementById('verifyBtn');
+            
+            if (!voterId) {
+                statusDiv.innerHTML = 'Please enter a voter ID to verify.';
+                statusDiv.className = 'status warning';
+                return;
+            }
+            
+            button.disabled = true;
+            statusDiv.innerHTML = `Checking deletion status for voter: ${voterId}...`;
+            statusDiv.className = 'status info';
+            resultsDiv.innerHTML = '';
+            
+            try {
+                const checks = [];
+                
+                // Check 1: Firestore voter document
+                try {
+                    const voterDoc = await getDoc(doc(db, 'voters', voterId));
+                    if (voterDoc.exists()) {
+                        checks.push({
+                            name: 'Firestore Voter Document',
+                            status: 'error',
+                            message: 'Still exists - deletion failed'
+                        });
+                    } else {
+                        checks.push({
+                            name: 'Firestore Voter Document',
+                            status: 'success',
+                            message: 'Successfully deleted'
+                        });
+                    }
+                } catch (error) {
+                    checks.push({
+                        name: 'Firestore Voter Document',
+                        status: 'error',
+                        message: `Error checking: ${error.message}`
+                    });
+                }
+                
+                // Check 2: Email verification tokens
+                try {
+                    const tokensQuery = query(
+                        collection(db, 'email_verifications'),
+                        where('voterId', '==', voterId)
+                    );
+                    const tokensSnapshot = await getDocs(tokensQuery);
+                    
+                    if (tokensSnapshot.empty) {
+                        checks.push({
+                            name: 'Email Verification Tokens',
+                            status: 'success',
+                            message: 'Successfully deleted'
+                        });
+                    } else {
+                        checks.push({
+                            name: 'Email Verification Tokens',
+                            status: 'error',
+                            message: `${tokensSnapshot.size} tokens still exist`
+                        });
+                    }
+                } catch (error) {
+                    checks.push({
+                        name: 'Email Verification Tokens',
+                        status: 'warning',
+                        message: `Error checking: ${error.message}`
+                    });
+                }
+                
+                // Check 3: Vote receipts
+                try {
+                    const receiptsQuery = query(
+                        collection(db, 'vote_receipts'),
+                        where('voterId', '==', voterId)
+                    );
+                    const receiptsSnapshot = await getDocs(receiptsQuery);
+                    
+                    if (receiptsSnapshot.empty) {
+                        checks.push({
+                            name: 'Vote Receipts',
+                            status: 'success',
+                            message: 'Successfully deleted'
+                        });
+                    } else {
+                        checks.push({
+                            name: 'Vote Receipts',
+                            status: 'error',
+                            message: `${receiptsSnapshot.size} receipts still exist`
+                        });
+                    }
+                } catch (error) {
+                    checks.push({
+                        name: 'Vote Receipts',
+                        status: 'warning',
+                        message: `Error checking: ${error.message}`
+                    });
+                }
+                
+                // Check 4: Audit logs (should exist)
+                try {
+                    const auditQuery = query(
+                        collection(db, 'audit_logs'),
+                        where('entityId', '==', voterId),
+                        where('action', '==', 'delete_voter_permanently')
+                    );
+                    const auditSnapshot = await getDocs(auditQuery);
+                    
+                    if (!auditSnapshot.empty) {
+                        const auditDoc = auditSnapshot.docs[0].data();
+                        checks.push({
+                            name: 'Audit Log',
+                            status: 'success',
+                            message: `Deletion logged at ${auditDoc.timestamp?.toDate?.()?.toLocaleString() || 'Unknown time'}`
+                        });
+                    } else {
+                        checks.push({
+                            name: 'Audit Log',
+                            status: 'warning',
+                            message: 'No deletion audit log found'
+                        });
+                    }
+                } catch (error) {
+                    checks.push({
+                        name: 'Audit Log',
+                        status: 'warning',
+                        message: `Error checking: ${error.message}`
+                    });
+                }
+                
+                // Display results
+                let allSuccess = true;
+                let resultsHTML = '<h3>Deletion Verification Results:</h3>';
+                
+                checks.forEach(check => {
+                    const icon = check.status === 'success' ? '✅' : 
+                                check.status === 'error' ? '❌' : '⚠️';
+                    
+                    if (check.status === 'error') allSuccess = false;
+                    
+                    resultsHTML += `
+                        <div class="check-item">
+                            <span class="check-icon">${icon}</span>
+                            <div>
+                                <strong>${check.name}:</strong> ${check.message}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                resultsDiv.innerHTML = resultsHTML;
+                
+                if (allSuccess) {
+                    statusDiv.innerHTML = `✅ Voter ${voterId} was successfully deleted from all systems!`;
+                    statusDiv.className = 'status success';
+                } else {
+                    statusDiv.innerHTML = `⚠️ Voter ${voterId} deletion verification completed with some issues.`;
+                    statusDiv.className = 'status warning';
+                }
+                
+            } catch (error) {
+                console.error('Error verifying deletion:', error);
+                statusDiv.innerHTML = `❌ Error verifying deletion: ${error.message}`;
+                statusDiv.className = 'status error';
+            } finally {
+                button.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>

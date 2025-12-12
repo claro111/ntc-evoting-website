@@ -5,7 +5,6 @@ import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 
 // Firebase configuration
-// TODO: Replace with your Firebase project configuration
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -22,7 +21,30 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
-export const functions = getFunctions(app);
+export const functions = getFunctions(app, 'us-central1');
+
+// Note: Emulator connection disabled for now to avoid connection issues
+// To use emulators, start them with: firebase emulators:start --only functions,firestore
+// Then uncomment the emulator connection code below
+
+/*
+// Connect to emulators in development (only when emulators are running)
+if (import.meta.env.DEV && window.location.search.includes('emulator=true')) {
+  try {
+    import('firebase/functions').then(({ connectFunctionsEmulator }) => {
+      connectFunctionsEmulator(functions, 'localhost', 5001);
+      console.log('🔧 Connected to Functions Emulator');
+    });
+    
+    import('firebase/firestore').then(({ connectFirestoreEmulator }) => {
+      connectFirestoreEmulator(db, 'localhost', 8080);
+      console.log('🔧 Connected to Firestore Emulator');
+    });
+  } catch (error) {
+    console.log('Emulators not available, using production Firebase');
+  }
+}
+*/
 
 // Set auth persistence to LOCAL (keeps user logged in across browser sessions)
 setPersistence(auth, browserLocalPersistence)

@@ -1272,3 +1272,13 @@
 .voting-candidate-card.disabled .voting-btn-vote {
   cursor: not-allowed;
 }
+/* Vote Progress Badge */
+.vote-progress-badge {
+  background: #1f2937;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 8px;
+}

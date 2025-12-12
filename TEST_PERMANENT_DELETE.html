@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Permanent Delete Function</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js"></script>
+</head>
+<body>
+    <h1>Test Permanent Delete Function</h1>
+    <div id="status">Loading...</div>
+    <div id="result"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDUBq8OUO2ZbKBzMwpjAhBBHQZ5EDCpBJo",
+            authDomain: "ntc-evoting-website.firebaseapp.com",
+            projectId: "ntc-evoting-website",
+            storageBucket: "ntc-evoting-website.firebasestorage.app",
+            messagingSenderId: "422004488",
+            appId: "1:422004488:web:5c6c5c5c5c5c5c5c5c5c5c"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const functions = getFunctions(app);
+
+        const statusDiv = document.getElementById('status');
+        const resultDiv = document.getElementById('result');
+
+        async function testPermanentDelete() {
+            try {
+                statusDiv.innerHTML = 'Checking for deactivated voters...';
+
+                // Get deactivated voters
+                const votersRef = collection(db, 'voters');
+                const deactivatedQuery = query(votersRef, where('status', '==', 'deactivated'));
+                const snapshot = await getDocs(deactivatedQuery);
+
+                if (snapshot.empty) {
+                    statusDiv.innerHTML = 'No deactivated voters found to test with.';
+                    return;
+                }
+
+                const testVoter = snapshot.docs[0];
+                const voterData = testVoter.data();
+
+                statusDiv.innerHTML = `Found test voter: ${voterData.fullName} (${voterData.email})`;
+
+                // Test the Cloud Function
+                const deleteVoterPermanently = httpsCallable(functions, 'deleteVoterPermanently');
+                
+                statusDiv.innerHTML = 'Testing permanent delete function...';
+                
+                const result = await deleteVoterPermanently({ voterId: testVoter.id });
+                
+                if (result.data.success) {
+                    resultDiv.innerHTML = `<div style="color: green;">✅ SUCCESS: ${result.data.message}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div style="color: red;">❌ FAILED: ${result.data.message}</div>`;
+                }
+
+            } catch (error) {
+                console.error('Error testing permanent delete:', error);
+                resultDiv.innerHTML = `<div style="color: red;">❌ ERROR: ${error.message}</div>`;
+            }
+        }
+
+        // Auto-run test when page loads
+        statusDiv.innerHTML = 'Initializing test...';
+        testPermanentDelete();
+    </script>
+</body>
+</html>

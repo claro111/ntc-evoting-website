@@ -368,27 +368,46 @@
 .btn-delete-permanent {
   flex: 1;
   padding: 10px 16px;
-  border: none;
+  border: 2px solid #dc2626;
   border-radius: 6px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
-  background: #dc2626;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-delete-permanent::before {
+  content: '⚠️';
+  margin-right: 4px;
 }
 
 .btn-delete-permanent:hover:not(:disabled) {
-  background: #b91c1c;
+  background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 38, 38, 0.4);
+}
+
+.btn-delete-permanent:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
 }
 
 .btn-delete-permanent:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* Voters Table (for Registered) */

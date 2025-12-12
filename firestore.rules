@@ -2,12 +2,15 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Allow admins to perform aggregation queries
+    allow read: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     // Email verifications - allow unauthenticated read and update for verification
     match /email_verifications/{verificationId} {
       allow read: if true;  // Anyone can read to verify email
       allow create: if request.auth != null;  // Only authenticated users can create
       allow update: if true;  // Allow unauthenticated update to mark token as used
       allow delete: if request.auth != null;  // Only authenticated users can delete
+      allow delete: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));  // Admins can delete for cleanup
     }
     
     // Voters collection - allow unauthenticated write for email verification
@@ -76,6 +79,14 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow update: if false;  // Receipts cannot be modified
       allow delete: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));  // Admins can delete for system reset
+    }
+    
+    // Audit logs collection
+    match /audit_logs/{logId} {
+      allow read: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow create: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow update: if false;  // Audit logs cannot be modified
+      allow delete: if false;  // Audit logs cannot be deleted
     }
   }
 }

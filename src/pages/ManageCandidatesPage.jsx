@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import FileUploadService from '../services/fileUploadService';
 import FileUpload from '../components/FileUpload';
 import { db, storage } from '../config/firebase';
@@ -25,9 +25,41 @@ const ManageCandidatesPage = () => {
   const [showPositionModal, setShowPositionModal] = useState(false);
   const [showCandidateModal, setShowCandidateModal] = useState(false);
   const [positionFilter, setPositionFilter] = useState('all');
+  const [election, setElection] = useState(null);
+  const [votingStarted, setVotingStarted] = useState(false);
 
   useEffect(() => {
     fetchData();
+    
+    // Set up real-time listener for election status
+    const electionRef = doc(db, 'elections', 'current');
+    const unsubscribeElection = onSnapshot(electionRef, (electionDoc) => {
+      if (electionDoc.exists()) {
+        const electionData = {
+          id: electionDoc.id,
+          ...electionDoc.data(),
+        };
+        setElection(electionData);
+        
+        // Check if voting has started
+        const now = new Date();
+        const startTime = electionData.startTime?.toDate();
+        const endTime = electionData.endTime?.toDate();
+        
+        const hasStarted = electionData.status === 'active' && 
+                          startTime && 
+                          now >= startTime;
+        
+        setVotingStarted(hasStarted);
+      } else {
+        setElection(null);
+        setVotingStarted(false);
+      }
+    });
+
+    return () => {
+      unsubscribeElection();
+    };
   }, []);
 
   const fetchData = async () => {
@@ -62,26 +94,47 @@ const ManageCandidatesPage = () => {
   };
 
   const handleAddPosition = () => {
+    if (votingStarted) {
+      showToast('Cannot manage positions while voting is active', 'error');
+      return;
+    }
     setSelectedPosition(null);
     setShowPositionModal(true);
   };
 
   const handleEditPosition = (position) => {
+    if (votingStarted) {
+      showToast('Cannot manage positions while voting is active', 'error');
+      return;
+    }
     setSelectedPosition(position);
     setShowPositionModal(true);
   };
 
   const handleAddCandidate = () => {
+    if (votingStarted) {
+      showToast('Cannot manage candidates while voting is active', 'error');
+      return;
+    }
     setSelectedCandidate(null);
     setShowCandidateModal(true);
   };
 
   const handleEditCandidate = (candidate) => {
+    if (votingStarted) {
+      showToast('Cannot manage candidates while voting is active', 'error');
+      return;
+    }
     setSelectedCandidate(candidate);
     setShowCandidateModal(true);
   };
 
   const handleLoadSampleData = async () => {
+    if (votingStarted) {
+      showToast('Cannot load sample data while voting is active', 'error');
+      return;
+    }
+    
     if (!window.confirm('This will add sample positions and candidates. Continue?')) {
       return;
     }
@@ -166,6 +219,11 @@ const ManageCandidatesPage = () => {
   };
 
   const handleResetData = async () => {
+    if (votingStarted) {
+      showToast('Cannot reset data while voting is active', 'error');
+      return;
+    }
+    
     const confirmMessage = 'WARNING: This will permanently delete ALL positions and candidates. This action cannot be undone. Are you sure?';
     
     if (!window.confirm(confirmMessage)) {
@@ -180,8 +238,24 @@ const ManageCandidatesPage = () => {
     try {
       setLoading(true);
 
-      // Delete all candidates
+      // Delete all candidates and their photos
       const candidatesSnapshot = await getDocs(collection(db, 'candidates'));
+      
+      // First, delete all candidate photos from Firebase Storage
+      const photoDeletePromises = candidatesSnapshot.docs.map(async (doc) => {
+        const candidateData = doc.data();
+        if (candidateData.photoUrl) {
+          try {
+            await FileUploadService.deleteFile(candidateData.photoUrl);
+          } catch (error) {
+            console.error('Error deleting candidate photo:', error);
+            // Continue even if photo deletion fails
+          }
+        }
+      });
+      await Promise.all(photoDeletePromises);
+      
+      // Then delete candidate documents from Firestore
       const candidateDeletePromises = candidatesSnapshot.docs.map((doc) =>
         deleteDoc(doc.ref)
       );
@@ -261,12 +335,22 @@ const ManageCandidatesPage = () => {
         </div>
         <div className="header-buttons">
           {canCreate('candidates') && (
-            <button className="btn-load-sample" onClick={handleLoadSampleData}>
+            <button 
+              className={`btn-load-sample ${votingStarted ? 'disabled' : ''}`} 
+              onClick={handleLoadSampleData}
+              disabled={votingStarted}
+              title={votingStarted ? 'Cannot load sample data while voting is active' : ''}
+            >
               Load Sample Data
             </button>
           )}
           {canDelete('candidates') && (
-            <button className="btn-reset-candidates" onClick={handleResetData}>
+            <button 
+              className={`btn-reset-candidates ${votingStarted ? 'disabled' : ''}`} 
+              onClick={handleResetData}
+              disabled={votingStarted}
+              title={votingStarted ? 'Cannot reset data while voting is active' : ''}
+            >
               Reset All Data
             </button>
           )}
@@ -291,6 +375,17 @@ const ManageCandidatesPage = () => {
         </div>
       </div>
 
+      {/* Voting Status Banner */}
+      {votingStarted && (
+        <div className="voting-active-banner">
+          <div className="banner-icon">⚠️</div>
+          <div className="banner-content">
+            <h3>Voting is Currently Active</h3>
+            <p>Candidate and position management is disabled while voting is in progress to maintain election integrity.</p>
+          </div>
+        </div>
+      )}
+
       {/* Tab Content */}
       <div className="tab-content">
         {activeTab === 'positions' && (
@@ -304,6 +399,7 @@ const ManageCandidatesPage = () => {
             canCreate={canCreate('candidates')}
             canEdit={canEdit('candidates')}
             canDelete={canDelete('candidates')}
+            votingStarted={votingStarted}
           />
         )}
         {activeTab === 'candidates' && (
@@ -320,6 +416,7 @@ const ManageCandidatesPage = () => {
             canCreate={canCreate('candidates')}
             canEdit={canEdit('candidates')}
             canDelete={canDelete('candidates')}
+            votingStarted={votingStarted}
           />
         )}
       </div>
@@ -378,8 +475,13 @@ const ManageCandidatesPage = () => {
 };
 
 // Positions Tab Component
-const PositionsTab = ({ positions, onAdd, onEdit, onRefresh, showToast, showConfirm, canCreate, canEdit: canEditPerm, canDelete }) => {
+const PositionsTab = ({ positions, onAdd, onEdit, onRefresh, showToast, showConfirm, canCreate, canEdit: canEditPerm, canDelete, votingStarted }) => {
   const handleDelete = async (position) => {
+    if (votingStarted) {
+      showToast('Cannot delete positions while voting is active', 'error');
+      return;
+    }
+    
     const confirmed = await showConfirm({
       title: 'Delete Position',
       message: `Are you sure you want to delete position "${position.name}"?`,
@@ -408,7 +510,12 @@ const PositionsTab = ({ positions, onAdd, onEdit, onRefresh, showToast, showConf
       <div className="section-header">
         <h2>Manage Positions</h2>
         {canCreate && (
-          <button className="btn-add" onClick={onAdd}>
+          <button 
+            className={`btn-add ${votingStarted ? 'disabled' : ''}`} 
+            onClick={onAdd}
+            disabled={votingStarted}
+            title={votingStarted ? 'Cannot manage positions while voting is active' : ''}
+          >
             + Add Position
           </button>
         )}
@@ -429,12 +536,22 @@ const PositionsTab = ({ positions, onAdd, onEdit, onRefresh, showToast, showConf
               </div>
               <div className="position-actions">
                 {canEditPerm && (
-                  <button className="btn-edit" onClick={() => onEdit(position)}>
+                  <button 
+                    className={`btn-edit ${votingStarted ? 'disabled' : ''}`} 
+                    onClick={() => onEdit(position)}
+                    disabled={votingStarted}
+                    title={votingStarted ? 'Cannot edit positions while voting is active' : ''}
+                  >
                     Edit
                   </button>
                 )}
                 {canDelete && (
-                  <button className="btn-delete" onClick={() => handleDelete(position)}>
+                  <button 
+                    className={`btn-delete ${votingStarted ? 'disabled' : ''}`} 
+                    onClick={() => handleDelete(position)}
+                    disabled={votingStarted}
+                    title={votingStarted ? 'Cannot delete positions while voting is active' : ''}
+                  >
                     Delete
                   </button>
                 )}
@@ -448,8 +565,13 @@ const PositionsTab = ({ positions, onAdd, onEdit, onRefresh, showToast, showConf
 };
 
 // Candidates Tab Component
-const CandidatesTab = ({ candidates, positions, positionFilter, onFilterChange, onAdd, onEdit, onRefresh, showToast, showConfirm, canCreate, canEdit: canEditPerm, canDelete }) => {
+const CandidatesTab = ({ candidates, positions, positionFilter, onFilterChange, onAdd, onEdit, onRefresh, showToast, showConfirm, canCreate, canEdit: canEditPerm, canDelete, votingStarted }) => {
   const handleDelete = async (candidate) => {
+    if (votingStarted) {
+      showToast('Cannot delete candidates while voting is active', 'error');
+      return;
+    }
+    
     const confirmed = await showConfirm({
       title: 'Delete Candidate',
       message: `Are you sure you want to delete candidate "${candidate.name}"?`,
@@ -464,6 +586,17 @@ const CandidatesTab = ({ candidates, positions, positionFilter, onFilterChange, 
     }
 
     try {
+      // Delete candidate photo from Firebase Storage if it exists
+      if (candidate.photoUrl) {
+        try {
+          await FileUploadService.deleteFile(candidate.photoUrl);
+        } catch (error) {
+          console.error('Error deleting candidate photo:', error);
+          // Continue with candidate deletion even if photo deletion fails
+        }
+      }
+      
+      // Delete candidate document from Firestore
       await deleteDoc(doc(db, 'candidates', candidate.id));
       showToast('Candidate deleted successfully', 'success');
       onRefresh();
@@ -491,7 +624,12 @@ const CandidatesTab = ({ candidates, positions, positionFilter, onFilterChange, 
             ))}
           </select>
           {canCreate && (
-            <button className="btn-add" onClick={onAdd}>
+            <button 
+              className={`btn-add ${votingStarted ? 'disabled' : ''}`} 
+              onClick={onAdd}
+              disabled={votingStarted}
+              title={votingStarted ? 'Cannot manage candidates while voting is active' : ''}
+            >
               + Add Candidate
             </button>
           )}
@@ -528,12 +666,22 @@ const CandidatesTab = ({ candidates, positions, positionFilter, onFilterChange, 
                     </div>
                     <div className="candidate-actions">
                       {canEditPerm && (
-                        <button className="btn-edit" onClick={() => onEdit(candidate)}>
+                        <button 
+                          className={`btn-edit ${votingStarted ? 'disabled' : ''}`} 
+                          onClick={() => onEdit(candidate)}
+                          disabled={votingStarted}
+                          title={votingStarted ? 'Cannot edit candidates while voting is active' : ''}
+                        >
                           Edit
                         </button>
                       )}
                       {canDelete && (
-                        <button className="btn-delete" onClick={() => handleDelete(candidate)}>
+                        <button 
+                          className={`btn-delete ${votingStarted ? 'disabled' : ''}`} 
+                          onClick={() => handleDelete(candidate)}
+                          disabled={votingStarted}
+                          title={votingStarted ? 'Cannot delete candidates while voting is active' : ''}
+                        >
                           Delete
                         </button>
                       )}
@@ -660,8 +808,31 @@ const CandidateFormModal = ({ candidate, positions, onClose, onSuccess, showToas
     platform: candidate?.platform || '<p><br></p>',
   });
   const [photoFile, setPhotoFile] = useState(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Reset photo states when candidate changes
+  useEffect(() => {
+    setPhotoFile(null);
+    setRemovePhoto(false);
+    setError('');
+  }, [candidate]);
+
+  const handlePhotoSelect = (file) => {
+    if (file && file.size > 5 * 1024 * 1024) {
+      setError('Photo file size must be less than 5MB');
+      return;
+    }
+    if (file) {
+      setError('');
+      setRemovePhoto(false); // Reset remove flag when new file is selected
+    } else {
+      // File is null, user wants to remove the photo
+      setRemovePhoto(true);
+    }
+    setPhotoFile(file);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -696,8 +867,29 @@ const CandidateFormModal = ({ candidate, positions, onClose, onSuccess, showToas
 
       let photoUrl = candidate?.photoUrl || '';
 
+      // Handle photo removal
+      if (removePhoto && candidate?.photoUrl) {
+        // Delete old photo from Firebase Storage
+        try {
+          await FileUploadService.deleteFile(candidate.photoUrl);
+        } catch (error) {
+          console.error('Error deleting old photo:', error);
+          // Continue with the process even if deletion fails
+        }
+        photoUrl = '';
+      }
       // Upload photo if new file selected
-      if (photoFile) {
+      else if (photoFile) {
+        // If updating existing candidate with new photo, delete old photo first
+        if (candidate?.photoUrl && candidate.photoUrl !== '') {
+          try {
+            await FileUploadService.deleteFile(candidate.photoUrl);
+          } catch (error) {
+            console.error('Error deleting old photo:', error);
+            // Continue with upload even if deletion fails
+          }
+        }
+        
         photoUrl = await FileUploadService.uploadCandidatePhoto(
           photoFile, 
           candidate?.id || `temp_${Date.now()}`,
@@ -841,13 +1033,19 @@ const CandidateFormModal = ({ candidate, positions, onClose, onSuccess, showToas
             <div className="form-group">
               <label className="form-label">Photo:</label>
               <FileUpload
-                onFileSelect={setPhotoFile}
+                onFileSelect={handlePhotoSelect}
                 accept="image/*"
                 maxSize={5 * 1024 * 1024}
                 placeholder="Upload candidate photo"
                 uploadType="image"
-                currentFile={candidate?.photoUrl ? { name: 'Current photo', type: 'image/jpeg' } : null}
+                currentFile={candidate?.photoUrl && !removePhoto ? { name: 'Current photo', type: 'image/jpeg' } : null}
               />
+              {removePhoto && candidate?.photoUrl && (
+                <div className="photo-removal-notice">
+                  <span className="removal-icon">🗑️</span>
+                  <span className="removal-text">Photo will be removed when saved</span>
+                </div>
+              )}
             </div>
 
             {error && <div className="error-message">{error}</div>}

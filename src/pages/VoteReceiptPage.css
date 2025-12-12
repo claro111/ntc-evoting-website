@@ -310,3 +310,24 @@
     font-size: 13px;
   }
 }
+/* Abstained Positions Styles */
+.receipt-vote-card.abstained {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 2px solid #f59e0b;
+}
+
+.receipt-candidate-item.abstained {
+  color: #92400e;
+  font-style: italic;
+}
+
+.receipt-abstain-icon {
+  color: #f59e0b;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.receipt-abstain-text {
+  font-weight: 600;
+  text-transform: uppercase;
+}

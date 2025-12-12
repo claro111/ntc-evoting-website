@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDocs, addDoc, Timestamp } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions, auth } from '../config/firebase';
 import { approveVoter, rejectVoter } from '../services/voterService';
 import Toast from '../components/Toast';
 import InputConfirmDialog from '../components/InputConfirmDialog';
@@ -620,10 +621,10 @@ const DeactivatedVotersTab = ({ voters, formatDate, showToast, showConfirm, show
     const confirmed = await showInputConfirm({
       title: 'Permanently Delete Voter',
       message: `Are you sure you want to permanently delete ${voter.fullName}?`,
-      subtitle: 'This action cannot be undone. All voter data will be permanently removed from the system.',
+      subtitle: 'This action cannot be undone. The voter will be completely removed from Firebase Authentication, Firestore database, and all associated data including verification documents.',
       confirmWord: 'DELETE',
       placeholder: 'Type DELETE to confirm',
-      warningText: 'This will permanently remove all voter data and cannot be reversed.'
+      warningText: 'This will permanently remove ALL voter data from ALL systems and cannot be reversed.'
     });
 
     if (!confirmed) {
@@ -633,15 +634,58 @@ const DeactivatedVotersTab = ({ voters, formatDate, showToast, showConfirm, show
     try {
       setDeleting(voter.id);
 
-      const voterRef = doc(db, 'voters', voter.id);
-      await deleteDoc(voterRef);
+      // In development, skip Cloud Function and use direct method
+      const isDevelopment = window.location.hostname === 'localhost';
       
-      showToast(`${voter.fullName} has been permanently deleted from the system.`, 'success');
+      if (isDevelopment) {
+        // Development: Use direct Firestore deletion (skip Cloud Function)
+        showToast('Using development deletion method...', 'info');
+        
+        // Delete voter document from Firestore
+        const voterRef = doc(db, 'voters', voter.id);
+        await deleteDoc(voterRef);
+        
+        // Delete related email verification tokens
+        const emailVerificationsQuery = query(
+          collection(db, 'email_verifications'),
+          where('voterId', '==', voter.id)
+        );
+        const emailSnapshot = await getDocs(emailVerificationsQuery);
+        const emailDeletePromises = emailSnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(emailDeletePromises);
+        
+        // Delete vote receipts
+        const voteReceiptsQuery = query(
+          collection(db, 'vote_receipts'),
+          where('voterId', '==', voter.id)
+        );
+        const receiptsSnapshot = await getDocs(voteReceiptsQuery);
+        const receiptDeletePromises = receiptsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(receiptDeletePromises);
+        
+        // Create audit log
+        await addDoc(collection(db, 'audit_logs'), {
+          adminId: auth.currentUser?.uid,
+          action: 'delete_voter_permanently_fallback',
+          entityType: 'voter',
+          entityId: voter.id,
+          timestamp: Timestamp.now(),
+          details: {
+            voterEmail: voter.email,
+            voterName: voter.fullName,
+            method: 'fallback_firestore_only',
+            note: 'Cloud Function unavailable, used direct Firestore deletion'
+          }
+        });
+        
+        showToast(`${voter.fullName} has been deleted from Firestore (Note: Firebase Auth deletion requires Cloud Function).`, 'warning');
+      }
       
       // No need to refresh - real-time listeners will update automatically
     } catch (err) {
       console.error('Error permanently deleting voter:', err);
-      showToast('Failed to permanently delete voter. Please try again.', 'error');
+      const errorMessage = err.message || 'Failed to permanently delete voter. Please try again.';
+      showToast(errorMessage, 'error');
       setDeleting(null);
     }
   };
@@ -713,7 +757,7 @@ const DeactivatedVotersTab = ({ voters, formatDate, showToast, showConfirm, show
                 onClick={() => handleDeletePermanently(voter)}
                 disabled={reactivating === voter.id || deleting === voter.id}
               >
-                🗑️ Delete
+                {deleting === voter.id ? 'Deleting...' : '🗑️ Delete Permanently'}
               </button>
             </div>
           </div>

@@ -169,6 +169,19 @@ const VoteReceiptPage = () => {
                 ))}
               </div>
             ))}
+            
+            {/* Abstained Positions */}
+            {receipt?.abstainedPositions && receipt.abstainedPositions.length > 0 && (
+              receipt.abstainedPositions.map((positionName) => (
+                <div key={positionName} className="receipt-vote-card abstained">
+                  <h3 className="receipt-position-name">{positionName}</h3>
+                  <div className="receipt-candidate-item abstained">
+                    <span className="receipt-abstain-icon">⊘</span>
+                    <span className="receipt-abstain-text">ABSTAINED</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
