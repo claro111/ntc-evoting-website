@@ -1,13 +1,12 @@
 .logo-container {
-  position: fixed;
+  position: absolute;
   top: 20px;
   left: 20px;
   display: flex;
   align-items: center;
   gap: 16px;
-  z-index: 999;
   background: transparent;
-  padding: 0;
+  z-index: 10;
 }
 
 .logo-image {

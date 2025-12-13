@@ -1,4 +1,5 @@
 .voter-homepage {
+  position: relative;
   min-height: 100vh;
   background: white;
   padding-top: 80px;
