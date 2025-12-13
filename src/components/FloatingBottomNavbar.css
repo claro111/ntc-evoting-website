@@ -198,7 +198,7 @@
   position: absolute;
   top: 4px;
   right: 8px;
-  background: #ef4444;
+  background: #ef4444 !important;
   color: white;
   font-size: 10px;
   font-weight: 700;
@@ -219,10 +219,6 @@
   50% {
     transform: scale(1.1);
   }
-}
-
-.nav-item.active .notification-badge {
-  background: #dc2626;
 }
 
 @media (max-width: 768px) {

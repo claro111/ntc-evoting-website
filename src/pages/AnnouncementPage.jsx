@@ -211,7 +211,7 @@ const AnnouncementPage = () => {
                   <div className="announcement-left">
                     <div className="announcement-avatar">
                       <div className="notification-bell">🔔</div>
-                      <div className="notification-badge"></div>
+                      <div className="announcement-notification-badge"></div>
                     </div>
                   </div>
 
