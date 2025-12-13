@@ -243,15 +243,7 @@ select.form-input option {
   flex: 1;
 }
 
-.error-message {
-  background-color: #fee;
-  border: 1px solid #fcc;
-  color: #c33;
-  padding: 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  text-align: center;
-}
+
 
 .btn-submit {
   width: 100%;

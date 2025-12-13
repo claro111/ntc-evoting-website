@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './SystemNotification.css';
 
-const SystemNotification = ({ isVisible, type, title, message, onClose, duration = 8000 }) => {
+const SystemNotification = ({ isVisible, type, title, message, onClose, duration = 8000, announcementData = null }) => {
   const navigate = useNavigate();
   const [show, setShow] = useState(false);
 
@@ -29,6 +29,15 @@ const SystemNotification = ({ isVisible, type, title, message, onClose, duration
   const handleClick = () => {
     if (type === 'voting-started') {
       navigate('/voter/voting');
+      handleClose(); // Close notification after navigation
+    } else if (type === 'new-announcement' && announcementData) {
+      // Navigate to announcements page with the specific announcement ID
+      navigate('/voter/announcements', { 
+        state: { 
+          openAnnouncementId: announcementData.id,
+          announcementData: announcementData 
+        } 
+      });
       handleClose(); // Close notification after navigation
     }
   };
@@ -60,7 +69,7 @@ const SystemNotification = ({ isVisible, type, title, message, onClose, duration
 
   return (
     <div 
-      className={`system-notification ${type} ${show ? 'show' : ''} ${type === 'voting-started' ? 'clickable' : ''}`}
+      className={`system-notification ${type} ${show ? 'show' : ''} ${(type === 'voting-started' || type === 'new-announcement') ? 'clickable' : ''}`}
       onClick={handleClick}
     >
       <div className="notification-content">

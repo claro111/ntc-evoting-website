@@ -283,12 +283,12 @@ const ManageAdminsPage = () => {
     }
   };
 
-  const handleDeleteAdmin = async (adminId, adminEmail) => {
+  const handleDeleteAdmin = async (adminId, adminEmail, adminName) => {
     const confirmed = await showConfirm({
-      title: 'Delete Admin',
-      message: `Are you sure you want to delete admin: ${adminEmail}?`,
-      warningText: 'Note: This will only remove the admin document. You\'ll need to manually delete the user from Firebase Authentication.',
-      confirmText: 'Delete',
+      title: 'Delete Admin Permanently',
+      message: `Are you sure you want to permanently delete admin: ${adminName} (${adminEmail})?`,
+      warningText: 'This action cannot be undone. The admin will be removed from both Firebase Authentication and Firestore Database.',
+      confirmText: 'Delete Permanently',
       cancelText: 'Cancel',
       type: 'danger'
     });
@@ -298,14 +298,62 @@ const ManageAdminsPage = () => {
     }
 
     try {
-      await deleteDoc(doc(db, 'admins', adminId));
-      setSuccess('Admin removed successfully!');
-      fetchAdmins();
-      setTimeout(() => setSuccess(''), 3000);
+      setSubmitting(true);
+      
+      // Get current user's auth token
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+      
+      const idToken = await user.getIdToken();
+      
+      // Call Cloud Function with timeout and fallback
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      );
+      
+      const deletePromise = fetch('https://us-central1-ntc-evoting-website.cloudfunctions.net/deleteAdminPermanently', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ adminId })
+      });
+      
+      let response;
+      try {
+        response = await Promise.race([deletePromise, timeoutPromise]);
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to delete admin');
+        }
+        
+        const result = await response.json();
+        console.log('Cloud Function result:', result);
+        
+        setSuccess(result.message || 'Admin deleted permanently from all systems!');
+        fetchAdmins();
+        setTimeout(() => setSuccess(''), 5000);
+        
+      } catch (fetchError) {
+        console.error('Cloud Function failed, using fallback:', fetchError);
+        
+        // Fallback: Delete only from Firestore
+        await deleteDoc(doc(db, 'admins', adminId));
+        setError('Admin removed from database. Please manually delete from Firebase Authentication if needed.');
+        fetchAdmins();
+        setTimeout(() => setError(''), 5000);
+      }
+      
     } catch (error) {
       console.error('Error deleting admin:', error);
-      setError('Failed to delete admin');
-      setTimeout(() => setError(''), 3000);
+      setError('Failed to delete admin: ' + error.message);
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -482,9 +530,10 @@ const ManageAdminsPage = () => {
                 {canDeleteAdmin(admin.role) && admin.id !== auth.currentUser?.uid && (
                   <button
                     className="btn-action btn-delete"
-                    onClick={() => handleDeleteAdmin(admin.id, admin.email)}
+                    onClick={() => handleDeleteAdmin(admin.id, admin.email, admin.name)}
+                    disabled={submitting}
                   >
-                    <FiTrash2 /> Delete
+                    <FiTrash2 /> {submitting ? 'Deleting...' : 'Delete'}
                   </button>
                 )}
               </div>

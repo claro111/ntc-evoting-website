@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import FloatingCountdownTimer from '../components/FloatingCountdownTimer';
 import FloatingBottomNavbar from '../components/FloatingBottomNavbar';
+import FilePreview from '../components/FilePreview';
 import Logo from '../components/Logo';
 import './AnnouncementPage.css';
 
 const AnnouncementPage = () => {
+  const location = useLocation();
   const [announcements, setAnnouncements] = useState([]);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -78,6 +81,18 @@ const AnnouncementPage = () => {
         
         setAnnouncements(announcementsData);
         setLoading(false);
+
+        // Check if we need to auto-open a specific announcement from navigation
+        const { openAnnouncementId, announcementData } = location.state || {};
+        if (openAnnouncementId && announcementsData.length > 0) {
+          // Find the announcement to open
+          const announcementToOpen = announcementsData.find(ann => ann.id === openAnnouncementId) || announcementData;
+          if (announcementToOpen) {
+            setSelectedAnnouncement(announcementToOpen);
+          }
+          // Clear the navigation state to prevent reopening on subsequent renders
+          window.history.replaceState({}, document.title);
+        }
       },
       (err) => {
         console.error('Error fetching announcements:', err);
@@ -91,7 +106,7 @@ const AnnouncementPage = () => {
       unsubscribeElection();
       unsubscribeAnnouncements();
     };
-  }, []);
+  }, [location.state]);
 
   const getTargetDate = () => {
     if (!election) return null;
@@ -179,29 +194,58 @@ const AnnouncementPage = () => {
             <p className="empty-subtext">Check back later for updates</p>
           </div>
         ) : (
-          <div className="announcements-list">
-            {announcements.map((announcement) => (
-              <div
-                key={announcement.id}
-                className="announcement-card"
-                onClick={() => handleAnnouncementClick(announcement)}
-              >
-                {/* Icon */}
-                <div className="announcement-icon">
-                  🔔
-                </div>
+          <div className="announcements-section">
+            {/* Latest Section Header */}
+            <div className="section-header">
+              <h2 className="section-title">Latest</h2>
+            </div>
+            
+            <div className="announcements-list">
+              {announcements.map((announcement) => (
+                <div
+                  key={announcement.id}
+                  className="announcement-card"
+                  onClick={() => handleAnnouncementClick(announcement)}
+                >
+                  {/* Left Side - Notification Bell with Blue Badge */}
+                  <div className="announcement-left">
+                    <div className="announcement-avatar">
+                      <div className="notification-bell">🔔</div>
+                      <div className="notification-badge"></div>
+                    </div>
+                  </div>
 
-                {/* Content */}
-                <div className="announcement-card-content">
-                  <h3 className="announcement-card-title">
-                    {announcement.title}
-                  </h3>
-                  <p className="announcement-card-description">
-                    {announcement.description.replace(/<[^>]*>/g, '')}
-                  </p>
+                  {/* Right Side - Content */}
+                  <div className="announcement-right">
+                    <div className="announcement-header-info">
+                      <h3 className="announcement-card-title">
+                        {announcement.title}
+                      </h3>
+                      <span className="announcement-time">
+                        {formatDate(announcement.createdAt)}
+                      </span>
+                    </div>
+                    
+                    <p className="announcement-card-description">
+                      {announcement.description.replace(/<[^>]*>/g, '')}
+                    </p>
+                    
+                    {/* Inline Attachment Preview */}
+                    {announcement.attachmentUrl && (
+                      <div className="announcement-card-attachment" onClick={(e) => e.stopPropagation()}>
+                        <FilePreview
+                          fileUrl={announcement.attachmentUrl}
+                          fileName={announcement.attachmentName}
+                          maxHeight="200px"
+                          showDownloadLink={false}
+                          className="announcement-card-preview"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -227,6 +271,18 @@ const AnnouncementPage = () => {
               className="announcement-modal-content"
               dangerouslySetInnerHTML={{ __html: selectedAnnouncement.description }}
             />
+
+            {/* Attachment Preview */}
+            {selectedAnnouncement.attachmentUrl && (
+              <div className="announcement-modal-attachment">
+                <FilePreview
+                  fileUrl={selectedAnnouncement.attachmentUrl}
+                  fileName={selectedAnnouncement.attachmentName}
+                  maxHeight="400px"
+                  showDownloadLink={true}
+                />
+              </div>
+            )}
 
             {/* Close Button */}
             <div className="announcement-modal-footer">

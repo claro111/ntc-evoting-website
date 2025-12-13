@@ -48,22 +48,19 @@
   background: #eff6ff;
 }
 
-/* Hide scrollbar but keep functionality */
+/* Hide scrollbar completely but keep functionality */
 .position-tabs-container::-webkit-scrollbar {
-  height: 4px;
+  display: none;
 }
 
-.position-tabs-container::-webkit-scrollbar-track {
-  background: #f3f4f6;
+/* For Firefox */
+.position-tabs-container {
+  scrollbar-width: none;
 }
 
-.position-tabs-container::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 2px;
-}
-
-.position-tabs-container::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+/* For Internet Explorer and Edge */
+.position-tabs-container {
+  -ms-overflow-style: none;
 }
 
 /* Responsive design */
@@ -83,33 +80,52 @@
     top: 0;
     margin-top: 25px;
     justify-content: flex-start;
+    padding: 0 10px;
+    box-sizing: border-box;
   }
 
   .position-tabs {
     justify-content: flex-start;
+    padding: 0 10px;
   }
 
   .position-tab {
     padding: 12px 16px;
     font-size: 12px;
+    min-width: fit-content;
   }
 }
 
 @media (max-width: 480px) {
   .position-tabs-container {
     margin-top: 20px;
+    padding: 0 5px;
+  }
+
+  .position-tabs {
+    padding: 0 5px;
   }
 
   .position-tab {
     padding: 10px 12px;
     font-size: 11px;
     letter-spacing: 0.3px;
+    min-width: fit-content;
   }
 }
 
 @media (max-width: 375px) {
+  .position-tabs-container {
+    padding: 0 2px;
+  }
+
+  .position-tabs {
+    padding: 0 2px;
+  }
+
   .position-tab {
     padding: 8px 10px;
     font-size: 10px;
+    min-width: fit-content;
   }
 }

@@ -3,6 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { registerVoter } from '../services/authService';
 import FileUpload from '../components/FileUpload';
 import FileUploadService from '../services/fileUploadService';
+import Toast from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 import './VoterRegisterPage.css';
 
 const VoterRegisterPage = () => {
@@ -19,11 +21,11 @@ const VoterRegisterPage = () => {
     password: '',
     confirmPassword: ''
   });
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [verificationFile, setVerificationFile] = useState(null);
+  const { toast, showToast, hideToast } = useToast();
 
   // Debug function to track file selection
   const handleFileSelect = (file) => {
@@ -36,9 +38,9 @@ const VoterRegisterPage = () => {
     } : 'No file');
     setVerificationFile(file);
     
-    // Clear any previous errors when file is selected
-    if (file && error) {
-      setError('');
+    // Clear any previous toast when file is selected
+    if (file && toast) {
+      hideToast();
     }
   };
 
@@ -48,61 +50,61 @@ const VoterRegisterPage = () => {
       ...prev,
       [name]: value
     }));
-    if (error) setError('');
+    if (toast) hideToast();
   };
 
   const validateForm = () => {
     // Check each field individually for better error messages
     if (!formData.firstName) {
-      setError('First Name is required');
+      showToast('First Name is required', 'warning');
       return false;
     }
     if (!formData.lastName) {
-      setError('Last Name is required');
+      showToast('Last Name is required', 'warning');
       return false;
     }
     if (!formData.birthdate) {
-      setError('Birthdate is required');
+      showToast('Birthdate is required', 'warning');
       return false;
     }
     if (!formData.studentId) {
-      setError('Student ID is required');
+      showToast('Student ID is required', 'warning');
       return false;
     }
     if (!formData.yearLevel) {
-      setError('Year Level is required');
+      showToast('Year Level is required', 'warning');
       return false;
     }
     if (!formData.school) {
-      setError('School is required');
+      showToast('School is required', 'warning');
       return false;
     }
     if (!formData.email) {
-      setError('Email is required');
+      showToast('Email is required', 'warning');
       return false;
     }
     if (!formData.password) {
-      setError('Password is required');
+      showToast('Password is required', 'warning');
       return false;
     }
     if (!formData.confirmPassword) {
-      setError('Confirm Password is required');
+      showToast('Confirm Password is required', 'warning');
       return false;
     }
 
     if (!verificationFile) {
-      setError('Please upload a verification document');
+      showToast('Please upload a verification document', 'warning');
       return false;
     }
 
     const emailRegex = /^[^\s@]+@ntc\.edu\.ph$/;
     if (!emailRegex.test(formData.email)) {
-      setError('Please use your NTC email address (@ntc.edu.ph)');
+      showToast('Please use your NTC email address (@ntc.edu.ph)', 'warning');
       return false;
     }
 
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
+      showToast('Password must be at least 8 characters long', 'warning');
       return false;
     }
 
@@ -113,12 +115,12 @@ const VoterRegisterPage = () => {
     const hasSymbol = /[!@#$%^&*(),.?":{}|<>]/.test(formData.password);
 
     if (!hasUppercase || !hasLowercase || !hasNumber || !hasSymbol) {
-      setError('Password must contain uppercase, lowercase, number, and symbol');
+      showToast('Password must contain uppercase, lowercase, number, and symbol', 'warning');
       return false;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      showToast('Passwords do not match', 'warning');
       return false;
     }
 
@@ -127,7 +129,7 @@ const VoterRegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    hideToast();
     setLoading(true);
 
     // Debug: Log form data and file
@@ -205,7 +207,7 @@ const VoterRegisterPage = () => {
           console.log('Verification document uploaded and voter updated successfully');
         } catch (uploadError) {
           console.error('Error uploading verification document:', uploadError);
-          setError('Registration successful, but document upload failed. Please contact admin.');
+          showToast('Registration successful, but document upload failed. Please contact admin.', 'warning');
           // Continue with registration even if upload fails
         }
       } else {
@@ -215,8 +217,12 @@ const VoterRegisterPage = () => {
         });
       }
 
-      alert('Registration successful! Your account is pending admin approval. You will receive an email once approved.');
-      navigate('/voter/login');
+      showToast('Registration successful! Your account is pending admin approval. You will receive an email once approved.', 'success');
+      
+      // Navigate after a short delay to allow user to see the success message
+      setTimeout(() => {
+        navigate('/voter/login');
+      }, 2000);
 
     } catch (err) {
       console.error('Registration error:', err);
@@ -227,17 +233,17 @@ const VoterRegisterPage = () => {
       });
       
       if (err.code === 'auth/email-already-in-use') {
-        setError('This email is already registered');
+        showToast('This email is already registered', 'error');
       } else if (err.code === 'auth/invalid-email') {
-        setError('Invalid email address');
+        showToast('Invalid email address', 'error');
       } else if (err.code === 'auth/weak-password') {
-        setError('Password is too weak. Please use a stronger password');
+        showToast('Password is too weak. Please use a stronger password', 'error');
       } else if (err.code === 'permission-denied') {
-        setError('Permission denied. Please check your account permissions.');
+        showToast('Permission denied. Please check your account permissions.', 'error');
       } else if (err.message && err.message.includes('Missing or insufficient permissions')) {
-        setError('Database permission error. Please contact administrator.');
+        showToast('Database permission error. Please contact administrator.', 'error');
       } else {
-        setError(err.message || 'Registration failed. Please try again');
+        showToast(err.message || 'Registration failed. Please try again', 'error');
       }
       
       setLoading(false);
@@ -461,13 +467,6 @@ const VoterRegisterPage = () => {
             />
           </div>
 
-          {/* Error Message */}
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
-
           {/* Submit Button */}
           <button
             type="submit"
@@ -483,6 +482,15 @@ const VoterRegisterPage = () => {
           </div>
         </form>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={hideToast}
+        />
+      )}
     </div>
   );
 };

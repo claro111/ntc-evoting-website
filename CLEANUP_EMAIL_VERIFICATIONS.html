@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cleanup Email Verifications Collection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { 
+            background-color: #6c757d; 
+            cursor: not-allowed; 
+        }
+        .danger { background-color: #dc3545; }
+        .danger:hover { background-color: #c82333; }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .verification-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .verification-item {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+        .verification-item.expired { border-left: 4px solid #dc3545; }
+        .verification-item.used { border-left: 4px solid #28a745; }
+        .verification-item.active { border-left: 4px solid #ffc107; }
+        .verification-item.orphaned { border-left: 4px solid #6c757d; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            color: white;
+        }
+        .stat-total { background-color: #007bff; }
+        .stat-expired { background-color: #dc3545; }
+        .stat-used { background-color: #28a745; }
+        .stat-active { background-color: #ffc107; }
+        .stat-orphaned { background-color: #6c757d; }
+        input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        .email-group {
+            border: 2px solid #007bff;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📧 Cleanup Email Verifications Collection</h1>
+        <p>This tool helps you analyze and clean up the email_verifications collection in Firestore.</p>
+
+        <div class="section">
+            <h3>Step 1: Analyze Email Verifications</h3>
+            <button onclick="analyzeVerifications()" id="analyzeBtn">🔍 Analyze Email Verifications</button>
+            <div id="analysisResults"></div>
+        </div>
+
+        <div class="section">
+            <h3>Step 2: Review Verification Tokens</h3>
+            <div id="verificationsByStatus"></div>
+        </div>
+
+        <div class="section">
+            <h3>Step 3: Cleanup Options</h3>
+            <div id="cleanupOptions"></div>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, collection, getDocs, doc, deleteDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration - Replace with your actual config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDxP8OKeam4rWvDwehGvo8vjSl15s0onfA",
+            authDomain: "ntc-evoting-website.firebaseapp.com",
+            projectId: "ntc-evoting-website",
+            storageBucket: "ntc-evoting-website.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdefghijklmnop"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Make functions available globally
+        window.auth = auth;
+        window.db = db;
+        window.collection = collection;
+        window.getDocs = getDocs;
+        window.doc = doc;
+        window.deleteDoc = deleteDoc;
+        window.query = query;
+        window.where = where;
+
+        // Auto-login prompt
+        window.addEventListener('load', () => {
+            addResult('info', 'Ready for analysis. Please ensure you are logged in as an admin.');
+        });
+    </script>
+
+    <script>
+        let allVerifications = [];
+        let allVoters = [];
+        let verificationStats = {
+            total: 0,
+            expired: 0,
+            used: 0,
+            active: 0,
+            orphaned: 0
+        };
+
+        function addResult(type, message) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        async function analyzeVerifications() {
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = 'Analyzing...';
+
+            try {
+                addResult('info', 'Fetching email verifications and voters from Firestore...');
+
+                // Get all email verifications
+                const verificationsRef = collection(db, 'email_verifications');
+                const verificationSnapshot = await getDocs(verificationsRef);
+                
+                // Get all voters for reference
+                const votersRef = collection(db, 'voters');
+                const votersSnapshot = await getDocs(votersRef);
+                
+                allVerifications = [];
+                allVoters = [];
+                verificationStats = { total: 0, expired: 0, used: 0, active: 0, orphaned: 0 };
+
+                // Process voters
+                votersSnapshot.docs.forEach(doc => {
+                    allVoters.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+
+                // Process verifications
+                const now = new Date();
+                verificationSnapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    const verification = {
+                        id: doc.id,
+                        ...data
+                    };
+                    allVerifications.push(verification);
+
+                    verificationStats.total++;
+
+                    // Determine status
+                    const expiresAt = data.expiresAt ? data.expiresAt.toDate() : null;
+                    const isExpired = expiresAt && expiresAt < now;
+                    const isUsed = data.used === true;
+                    const voterExists = allVoters.some(v => v.id === data.voterId);
+
+                    if (!voterExists) {
+                        verificationStats.orphaned++;
+                        verification.status = 'orphaned';
+                    } else if (isUsed) {
+                        verificationStats.used++;
+                        verification.status = 'used';
+                    } else if (isExpired) {
+                        verificationStats.expired++;
+                        verification.status = 'expired';
+                    } else {
+                        verificationStats.active++;
+                        verification.status = 'active';
+                    }
+                });
+
+                displayAnalysis();
+                displayVerificationsByStatus();
+                displayCleanupOptions();
+
+                addResult('success', `Analysis complete! Found ${verificationStats.total} verification tokens.`);
+
+            } catch (error) {
+                addResult('error', `Error analyzing verifications: ${error.message}`);
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = '🔍 Analyze Email Verifications';
+            }
+        }
+
+        function displayAnalysis() {
+            const analysisDiv = document.getElementById('analysisResults');
+            
+            const statsHtml = `
+                <div class="stats">
+                    <div class="stat-card stat-total">
+                        <h4>Total Tokens</h4>
+                        <h2>${verificationStats.total}</h2>
+                    </div>
+                    <div class="stat-card stat-expired">
+                        <h4>Expired</h4>
+                        <h2>${verificationStats.expired}</h2>
+                    </div>
+                    <div class="stat-card stat-used">
+                        <h4>Used</h4>
+                        <h2>${verificationStats.used}</h2>
+                    </div>
+                    <div class="stat-card stat-active">
+                        <h4>Active</h4>
+                        <h2>${verificationStats.active}</h2>
+                    </div>
+                    <div class="stat-card stat-orphaned">
+                        <h4>Orphaned</h4>
+                        <h2>${verificationStats.orphaned}</h2>
+                    </div>
+                </div>
+            `;
+
+            let recommendationHtml = '';
+            const cleanupCount = verificationStats.expired + verificationStats.used + verificationStats.orphaned;
+            
+            if (cleanupCount > 0) {
+                recommendationHtml = `
+                    <div class="status warning">
+                        <strong>🧹 Cleanup Recommended:</strong> Found ${cleanupCount} tokens that can be safely deleted:
+                        <ul>
+                            <li><strong>Expired (${verificationStats.expired}):</strong> Past expiration date</li>
+                            <li><strong>Used (${verificationStats.used}):</strong> Already used for verification</li>
+                            <li><strong>Orphaned (${verificationStats.orphaned}):</strong> Voter no longer exists</li>
+                        </ul>
+                        <strong>Keep Active (${verificationStats.active}):</strong> Valid tokens for pending verifications
+                    </div>
+                `;
+            } else {
+                recommendationHtml = `
+                    <div class="status success">
+                        <strong>✅ Collection is clean:</strong> All tokens are active and valid.
+                    </div>
+                `;
+            }
+
+            analysisDiv.innerHTML = statsHtml + recommendationHtml;
+        }
+
+        function displayVerificationsByStatus() {
+            const statusDiv = document.getElementById('verificationsByStatus');
+            
+            let html = '';
+
+            // Group by email address
+            const emailGroups = {};
+            allVerifications.forEach(verification => {
+                if (verification.email) {
+                    if (!emailGroups[verification.email]) {
+                        emailGroups[verification.email] = [];
+                    }
+                    emailGroups[verification.email].push(verification);
+                }
+            });
+
+            // Show email groups with multiple tokens
+            const duplicateEmails = Object.entries(emailGroups).filter(([email, tokens]) => tokens.length > 1);
+            
+            if (duplicateEmails.length > 0) {
+                html += `
+                    <div class="status warning">
+                        <strong>🚨 MULTIPLE TOKENS PER EMAIL:</strong> Found ${duplicateEmails.length} emails with multiple verification tokens.
+                    </div>
+                    <h4>EMAILS WITH MULTIPLE TOKENS (${duplicateEmails.length})</h4>
+                    <div class="verification-list">
+                `;
+                
+                duplicateEmails.forEach(([email, tokens]) => {
+                    html += `<div class="email-group">`;
+                    html += `<strong style="color: #007bff;">📧 ${email} (${tokens.length} tokens)</strong><br>`;
+                    
+                    // Sort by creation date (newest first)
+                    tokens.sort((a, b) => {
+                        const aDate = a.createdAt ? a.createdAt.toDate() : new Date(0);
+                        const bDate = b.createdAt ? b.createdAt.toDate() : new Date(0);
+                        return bDate - aDate;
+                    });
+                    
+                    tokens.forEach((token, index) => {
+                        const createdAt = token.createdAt ? token.createdAt.toDate().toLocaleDateString() : 'Unknown';
+                        const expiresAt = token.expiresAt ? token.expiresAt.toDate().toLocaleDateString() : 'Unknown';
+                        const voter = allVoters.find(v => v.id === token.voterId);
+                        const voterName = voter ? voter.fullName : 'Voter not found';
+                        const isRecommendedKeep = index === 0 && token.status === 'active'; // Keep newest active token
+                        
+                        html += `
+                            <div class="verification-item ${token.status}" style="margin: 5px 0; ${isRecommendedKeep ? 'border-left: 4px solid #28a745;' : ''}">
+                                ${isRecommendedKeep ? '✅ KEEP' : '🗑️ DELETE'} - <strong>Token ${index + 1}</strong> (${token.status.toUpperCase()})<br>
+                                <small>Voter: ${voterName} | Created: ${createdAt} | Expires: ${expiresAt}</small><br>
+                                <small>ID: ${token.id} | Used: ${token.used ? 'Yes' : 'No'}</small>
+                                ${!isRecommendedKeep ? `<br><input type="checkbox" id="delete_${token.id}" data-token-id="${token.id}" ${token.status !== 'active' ? 'checked' : ''}> Mark for deletion` : ''}
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
+                });
+                
+                html += '</div>';
+            }
+
+            // Show by status
+            const statuses = ['expired', 'used', 'orphaned', 'active'];
+            
+            statuses.forEach(status => {
+                const tokens = allVerifications.filter(v => v.status === status);
+                if (tokens.length > 0) {
+                    html += `
+                        <h4>${status.toUpperCase()} TOKENS (${tokens.length})</h4>
+                        <div class="verification-list">
+                    `;
+                    
+                    tokens.forEach(token => {
+                        const createdAt = token.createdAt ? token.createdAt.toDate().toLocaleDateString() : 'Unknown';
+                        const expiresAt = token.expiresAt ? token.expiresAt.toDate().toLocaleDateString() : 'Unknown';
+                        const voter = allVoters.find(v => v.id === token.voterId);
+                        const voterName = voter ? voter.fullName : 'Voter not found';
+                        
+                        html += `
+                            <div class="verification-item ${status}">
+                                <strong>${token.email || 'No Email'}</strong> → <strong>${voterName}</strong><br>
+                                <small>Created: ${createdAt} | Expires: ${expiresAt} | Used: ${token.used ? 'Yes' : 'No'}</small><br>
+                                <small>Token ID: ${token.id} | Voter ID: ${token.voterId || 'N/A'}</small>
+                                ${status !== 'active' ? `<br><input type="checkbox" id="delete_${token.id}" data-token-id="${token.id}" checked> Mark for deletion` : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                }
+            });
+
+            statusDiv.innerHTML = html;
+        }
+
+        function displayCleanupOptions() {
+            const cleanupDiv = document.getElementById('cleanupOptions');
+            
+            let html = '';
+            
+            if (verificationStats.expired > 0) {
+                html += `
+                    <button onclick="selectAllExpired()" class="danger">Select All Expired (${verificationStats.expired})</button>
+                `;
+            }
+            
+            if (verificationStats.used > 0) {
+                html += `
+                    <button onclick="selectAllUsed()" class="danger">Select All Used (${verificationStats.used})</button>
+                `;
+            }
+            
+            if (verificationStats.orphaned > 0) {
+                html += `
+                    <button onclick="selectAllOrphaned()" class="danger">Select All Orphaned (${verificationStats.orphaned})</button>
+                `;
+            }
+
+            const cleanupCount = verificationStats.expired + verificationStats.used + verificationStats.orphaned;
+            if (cleanupCount > 0) {
+                html += `
+                    <button onclick="selectAllCleanup()" class="danger">🧹 Select All Cleanup (${cleanupCount})</button>
+                    <button onclick="deleteSelected()" class="danger">🗑️ Delete Selected</button>
+                    <button onclick="clearSelection()">Clear Selection</button>
+                `;
+            }
+
+            if (html) {
+                cleanupDiv.innerHTML = `
+                    <div class="status warning">
+                        <strong>⚠️ Cleanup Actions:</strong> These actions will permanently delete verification tokens from Firestore.
+                    </div>
+                    ${html}
+                `;
+            } else {
+                cleanupDiv.innerHTML = `
+                    <div class="status info">
+                        <strong>ℹ️ No cleanup needed:</strong> All tokens are active and valid.
+                    </div>
+                `;
+            }
+        }
+
+        function selectAllExpired() {
+            selectByStatus('expired');
+        }
+
+        function selectAllUsed() {
+            selectByStatus('used');
+        }
+
+        function selectAllOrphaned() {
+            selectByStatus('orphaned');
+        }
+
+        function selectAllCleanup() {
+            selectByStatus('expired');
+            selectByStatus('used');
+            selectByStatus('orphaned');
+        }
+
+        function selectByStatus(status) {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                const tokenId = cb.dataset.tokenId;
+                const token = allVerifications.find(v => v.id === tokenId);
+                if (token && token.status === status) {
+                    cb.checked = true;
+                }
+            });
+        }
+
+        function clearSelection() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = false);
+        }
+
+        async function deleteSelected() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+            
+            if (checkboxes.length === 0) {
+                addResult('warning', 'No tokens selected for deletion.');
+                return;
+            }
+
+            const confirmed = confirm(`Are you sure you want to delete ${checkboxes.length} verification tokens? This action cannot be undone.`);
+            if (!confirmed) return;
+
+            addResult('info', `Starting deletion of ${checkboxes.length} verification tokens...`);
+
+            let deleted = 0;
+            let errors = 0;
+
+            for (const checkbox of checkboxes) {
+                const tokenId = checkbox.dataset.tokenId;
+                try {
+                    const tokenRef = doc(db, 'email_verifications', tokenId);
+                    await deleteDoc(tokenRef);
+                    deleted++;
+                    addResult('success', `Deleted token: ${tokenId}`);
+                } catch (error) {
+                    errors++;
+                    addResult('error', `Failed to delete ${tokenId}: ${error.message}`);
+                }
+            }
+
+            addResult('info', `Cleanup complete! Deleted: ${deleted}, Errors: ${errors}`);
+            
+            // Re-analyze after cleanup
+            setTimeout(() => analyzeVerifications(), 1000);
+        }
+    </script>
+</body>
+</html>

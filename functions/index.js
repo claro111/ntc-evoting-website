@@ -3,6 +3,7 @@ require('dotenv').config();
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
+const cors = require('cors')({ origin: true });
 
 admin.initializeApp();
 
@@ -244,119 +245,15 @@ exports.rejectVoter = functions.https.onCall(async (data, context) => {
   }
 });
 
-/**
- * Cloud Function to permanently delete a voter
- * Deletes user from Firebase Authentication and Firestore
- */
-exports.deleteVoterPermanently = functions.https.onCall(async (data, context) => {
-  // Check if user is authenticated and is an admin
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      'unauthenticated',
-      'User must be authenticated to delete voters.'
-    );
-  }
+// Import the simple delete voter function
+const { deleteVoterPermanently } = require('./deleteVoterSimple');
 
-  const { voterId } = data;
+// Import the delete admin function
+const { deleteAdminPermanently } = require('./deleteAdminPermanently');
 
-  if (!voterId) {
-    throw new functions.https.HttpsError(
-      'invalid-argument',
-      'voterId is required.'
-    );
-  }
-
-  try {
-    const voterRef = admin.firestore().collection('voters').doc(voterId);
-    const voterDoc = await voterRef.get();
-
-    if (!voterDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Voter not found.');
-    }
-
-    const voterData = voterDoc.data();
-
-    // Delete user from Firebase Authentication if they have an auth account
-    try {
-      await admin.auth().deleteUser(voterId);
-      console.log(`Successfully deleted user ${voterId} from Firebase Auth`);
-    } catch (authError) {
-      console.log(`User ${voterId} not found in Firebase Auth or already deleted:`, authError.message);
-      // Continue with Firestore deletion even if auth deletion fails
-    }
-
-    // Delete verification documents from storage if they exist
-    if (voterData.verificationDocuments && voterData.verificationDocuments.length > 0) {
-      const bucket = admin.storage().bucket();
-      for (const docUrl of voterData.verificationDocuments) {
-        try {
-          // Extract file path from URL
-          const filePath = docUrl.split('/o/')[1]?.split('?')[0];
-          if (filePath) {
-            const decodedPath = decodeURIComponent(filePath);
-            await bucket.file(decodedPath).delete();
-            console.log(`Deleted verification document: ${decodedPath}`);
-          }
-        } catch (storageError) {
-          console.error('Error deleting verification document:', storageError);
-          // Continue even if storage deletion fails
-        }
-      }
-    }
-
-    // Delete related data from other collections
-    const batch = admin.firestore().batch();
-
-    // Delete email verification tokens
-    const emailVerificationsQuery = await admin.firestore()
-      .collection('email_verifications')
-      .where('voterId', '==', voterId)
-      .get();
-    
-    emailVerificationsQuery.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
-    // Delete vote receipts (keep votes anonymous but remove receipts)
-    const voteReceiptsQuery = await admin.firestore()
-      .collection('vote_receipts')
-      .where('voterId', '==', voterId)
-      .get();
-    
-    voteReceiptsQuery.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
-    // Delete the voter document from Firestore
-    batch.delete(voterRef);
-
-    // Commit all deletions
-    await batch.commit();
-
-    // Log admin action
-    await admin.firestore().collection('audit_logs').add({
-      adminId: context.auth.uid,
-      action: 'delete_voter_permanently',
-      entityType: 'voter',
-      entityId: voterId,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      details: {
-        voterEmail: voterData.email,
-        voterName: voterData.fullName,
-        deletedFromAuth: true,
-        deletedFromFirestore: true,
-      },
-    });
-
-    return {
-      success: true,
-      message: 'Voter permanently deleted from all systems.',
-    };
-  } catch (error) {
-    console.error('Error permanently deleting voter:', error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
+// Export the delete functions
+exports.deleteVoterPermanently = deleteVoterPermanently;
+exports.deleteAdminPermanently = deleteAdminPermanently;
 
 /**
  * Cloud Function to verify email token

@@ -30,6 +30,11 @@ const ManageVotersPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    emailStatus: 'all', // all, verified, unverified
+    votingStatus: 'all' // all, voted, not-voted
+  });
   const { toast, showToast, hideToast } = useToast();
   const { confirmDialog, showInputConfirm } = useInputConfirm();
   const { confirmState, showConfirm } = useConfirm();
@@ -159,15 +164,44 @@ const ManageVotersPage = () => {
   };
 
   const filterVoters = (voters) => {
-    if (!searchQuery) return voters;
+    let filteredVoters = voters;
     
-    const query = searchQuery.toLowerCase();
-    return voters.filter(
-      (voter) =>
-        voter.fullName?.toLowerCase().includes(query) ||
-        voter.studentId?.toLowerCase().includes(query) ||
-        voter.email?.toLowerCase().includes(query)
-    );
+    // Apply search query filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filteredVoters = filteredVoters.filter(
+        (voter) =>
+          voter.fullName?.toLowerCase().includes(query) ||
+          voter.studentId?.toLowerCase().includes(query) ||
+          voter.email?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply email status filter (only for registered voters)
+    if (activeTab === 'registered' && filters.emailStatus !== 'all') {
+      filteredVoters = filteredVoters.filter((voter) => {
+        if (filters.emailStatus === 'verified') {
+          return voter.emailVerified === true;
+        } else if (filters.emailStatus === 'unverified') {
+          return voter.emailVerified !== true;
+        }
+        return true;
+      });
+    }
+    
+    // Apply voting status filter (only for registered voters)
+    if (activeTab === 'registered' && filters.votingStatus !== 'all') {
+      filteredVoters = filteredVoters.filter((voter) => {
+        if (filters.votingStatus === 'voted') {
+          return voter.hasVoted === true;
+        } else if (filters.votingStatus === 'not-voted') {
+          return voter.hasVoted !== true;
+        }
+        return true;
+      });
+    }
+    
+    return filteredVoters;
   };
 
   const formatDate = (timestamp) => {
@@ -269,7 +303,11 @@ const ManageVotersPage = () => {
             onChange={handleSearch}
           />
         </div>
-        <button className="filters-button">
+        {activeTab === 'registered' && (
+          <button 
+            className={`filters-button ${showFilters ? 'active' : ''}`}
+            onClick={() => setShowFilters(!showFilters)}
+          >
           <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
@@ -279,15 +317,61 @@ const ManageVotersPage = () => {
             />
           </svg>
           Filters
-        </button>
+          {activeTab === 'registered' && (filters.emailStatus !== 'all' || filters.votingStatus !== 'all') && (
+            <span className="filter-active-indicator">●</span>
+          )}
+          </button>
+        )}
       </div>
+
+      {/* Filters Panel */}
+      {showFilters && activeTab === 'registered' && (
+        <div className="filters-panel">
+          <div className="filters-content">
+            <div className="filter-group">
+              <label className="filter-label">Email Status:</label>
+              <select 
+                className="filter-select"
+                value={filters.emailStatus}
+                onChange={(e) => setFilters(prev => ({ ...prev, emailStatus: e.target.value }))}
+              >
+                <option value="all">All</option>
+                <option value="verified">Verified</option>
+                <option value="unverified">Unverified</option>
+              </select>
+            </div>
+            <div className="filter-group">
+              <label className="filter-label">Status:</label>
+              <select 
+                className="filter-select"
+                value={filters.votingStatus}
+                onChange={(e) => setFilters(prev => ({ ...prev, votingStatus: e.target.value }))}
+              >
+                <option value="all">All</option>
+                <option value="voted">Voted</option>
+                <option value="not-voted">Not Voted</option>
+              </select>
+            </div>
+            <button 
+              className="clear-filters-btn"
+              onClick={() => setFilters({ emailStatus: 'all', votingStatus: 'all' })}
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="tabs-container">
         <div className="tabs">
           <button
             className={`tab ${activeTab === 'pending' ? 'active' : ''}`}
-            onClick={() => setActiveTab('pending')}
+            onClick={() => {
+              setActiveTab('pending');
+              setShowFilters(false);
+              setFilters({ emailStatus: 'all', votingStatus: 'all' });
+            }}
           >
             Pending Reviews 
             {stats.pendingReviews > 0 && (
@@ -296,13 +380,21 @@ const ManageVotersPage = () => {
           </button>
           <button
             className={`tab ${activeTab === 'registered' ? 'active' : ''}`}
-            onClick={() => setActiveTab('registered')}
+            onClick={() => {
+              setActiveTab('registered');
+              setShowFilters(false);
+              setFilters({ emailStatus: 'all', votingStatus: 'all' });
+            }}
           >
             Registered Voters ({stats.registeredVoters})
           </button>
           <button
             className={`tab ${activeTab === 'deactivated' ? 'active' : ''}`}
-            onClick={() => setActiveTab('deactivated')}
+            onClick={() => {
+              setActiveTab('deactivated');
+              setShowFilters(false);
+              setFilters({ emailStatus: 'all', votingStatus: 'all' });
+            }}
           >
             Deactivated Voters ({stats.deactivatedVoters})
           </button>
@@ -512,7 +604,7 @@ const RegisteredVotersTab = ({ voters, formatDate, onEditClick, onDeleteClick })
             <th>Student Number</th>
             <th>Email</th>
             <th>Email Status</th>
-            <th>Voted Status</th>
+            <th>Status</th>
             <th>Expires</th>
             <th>Actions</th>
           </tr>
@@ -634,12 +726,47 @@ const DeactivatedVotersTab = ({ voters, formatDate, showToast, showConfirm, show
     try {
       setDeleting(voter.id);
 
-      // In development, skip Cloud Function and use direct method
-      const isDevelopment = window.location.hostname === 'localhost';
+      // Try Cloud Function first with timeout
+      let cloudFunctionSuccess = false;
       
-      if (isDevelopment) {
-        // Development: Use direct Firestore deletion (skip Cloud Function)
-        showToast('Using development deletion method...', 'info');
+      try {
+        showToast('Attempting complete deletion (including Firebase Auth)...', 'info');
+        
+        // Get the current user's ID token for authentication
+        const idToken = await auth.currentUser.getIdToken();
+        
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Cloud Function timeout')), 10000); // 10 second timeout
+        });
+        
+        // Call the Cloud Function HTTP endpoint with timeout
+        const fetchPromise = fetch('https://us-central1-ntc-evoting-website.cloudfunctions.net/deleteVoterPermanently', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            voterId: voter.id
+          })
+        });
+
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || result.message || 'Failed to delete voter');
+        }
+
+        showToast(result.message || 'Voter permanently deleted from all systems including Firebase Auth.', 'success');
+        cloudFunctionSuccess = true;
+        
+      } catch (cloudErr) {
+        console.log('Cloud Function failed, using fallback:', cloudErr.message);
+        
+        // Use fallback deletion method
+        showToast('Using fallback deletion method...', 'warning');
         
         // Delete voter document from Firestore
         const voterRef = doc(db, 'voters', voter.id);
@@ -674,18 +801,20 @@ const DeactivatedVotersTab = ({ voters, formatDate, showToast, showConfirm, show
             voterEmail: voter.email,
             voterName: voter.fullName,
             method: 'fallback_firestore_only',
-            note: 'Cloud Function unavailable, used direct Firestore deletion'
+            note: 'Cloud Function unavailable, used direct Firestore deletion',
+            cloudFunctionError: cloudErr.message
           }
         });
         
-        showToast(`${voter.fullName} has been deleted from Firestore (Note: Firebase Auth deletion requires Cloud Function).`, 'warning');
+        showToast(`${voter.fullName} deleted from Firestore. Note: Firebase Auth account and verification documents may still exist and need manual deletion.`, 'warning');
       }
       
-      // No need to refresh - real-time listeners will update automatically
+      // Reset deleting state
+      setDeleting(null);
+      
     } catch (err) {
       console.error('Error permanently deleting voter:', err);
-      const errorMessage = err.message || 'Failed to permanently delete voter. Please try again.';
-      showToast(errorMessage, 'error');
+      showToast('Failed to delete voter. Please try again.', 'error');
       setDeleting(null);
     }
   };

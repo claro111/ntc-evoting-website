@@ -152,12 +152,10 @@ const CandidateCarousel = ({ candidates, onSeeMore }) => {
           pauseAutoSlide();
         }}
         navigation={false}
-        pagination={{ 
+        pagination={candidates.length > 1 ? { 
           clickable: true,
-          el: '.swiper-pagination',
-          bulletClass: 'swiper-pagination-bullet',
-          bulletActiveClass: 'swiper-pagination-bullet-active'
-        }}
+          dynamicBullets: false
+        } : false}
         watchSlidesProgress={true}
         allowTouchMove={true}
         className="candidate-swiper"

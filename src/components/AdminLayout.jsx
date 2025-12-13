@@ -11,6 +11,7 @@ const AdminLayout = () => {
   const [userRole, setUserRole] = useState('');
   const [loading, setLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     fetchUserRole();
@@ -85,10 +86,49 @@ const AdminLayout = () => {
     return location.pathname === path;
   };
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleNavigation = (path) => {
+    navigate(path);
+    closeMobileMenu();
+  };
+
   return (
     <div className="admin-layout">
+      {/* Mobile Header */}
+      <header className="admin-mobile-header">
+        <div className="admin-mobile-logo">
+          <img 
+            src="/ntc-logo.png" 
+            alt="NTC Logo" 
+            className="admin-mobile-logo-image"
+          />
+          <span className="admin-mobile-logo-text">NTC Admin</span>
+        </div>
+        <button 
+          className="admin-hamburger-button"
+          onClick={toggleMobileMenu}
+          aria-label="Toggle menu"
+        >
+          <span className={`hamburger-line ${isMobileMenuOpen ? 'open' : ''}`}></span>
+          <span className={`hamburger-line ${isMobileMenuOpen ? 'open' : ''}`}></span>
+          <span className={`hamburger-line ${isMobileMenuOpen ? 'open' : ''}`}></span>
+        </button>
+      </header>
+
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="admin-mobile-overlay" onClick={closeMobileMenu}></div>
+      )}
+
       {/* Sidebar */}
-      <aside className="admin-sidebar">
+      <aside className={`admin-sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
         {/* Logo */}
         <div className="admin-sidebar-logo">
           <img 
@@ -105,7 +145,7 @@ const AdminLayout = () => {
             {menuItems.map((item) => (
               <li key={item.path} className="admin-nav-item">
                 <button
-                  onClick={() => navigate(item.path)}
+                  onClick={() => handleNavigation(item.path)}
                   className={`admin-nav-button ${isActive(item.path) ? 'active' : ''}`}
                 >
                   {item.name}
@@ -120,7 +160,13 @@ const AdminLayout = () => {
 
         {/* Logout Button */}
         <div className="admin-sidebar-footer">
-          <button onClick={handleLogout} className="admin-logout-button">
+          <button 
+            onClick={() => {
+              handleLogout();
+              closeMobileMenu();
+            }} 
+            className="admin-logout-button"
+          >
             Logout
           </button>
         </div>

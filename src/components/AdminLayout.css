@@ -4,6 +4,87 @@
   height: 100vh;
   background: #f3f4f6;
   overflow: hidden;
+  position: relative;
+}
+
+/* Mobile Header */
+.admin-mobile-header {
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: #003366;
+  color: white;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  height: 60px;
+  box-sizing: border-box;
+}
+
+.admin-mobile-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-mobile-logo-image {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.admin-mobile-logo-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+}
+
+/* Hamburger Button */
+.admin-hamburger-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  width: 32px;
+  height: 32px;
+}
+
+.hamburger-line {
+  width: 24px;
+  height: 3px;
+  background: white;
+  transition: all 0.3s ease;
+  transform-origin: center;
+}
+
+.hamburger-line.open:nth-child(1) {
+  transform: rotate(45deg) translate(6px, 6px);
+}
+
+.hamburger-line.open:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-line.open:nth-child(3) {
+  transform: rotate(-45deg) translate(6px, -6px);
+}
+
+/* Mobile Overlay */
+.admin-mobile-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 998;
 }
 
 /* Sidebar */
@@ -14,6 +95,7 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  transition: transform 0.3s ease;
 }
 
 /* Logo Section */
@@ -40,6 +122,8 @@
 .admin-nav {
   flex: 1;
   padding: 20px 0;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .admin-nav-list {
@@ -83,6 +167,8 @@
 /* Logout Section */
 .admin-sidebar-footer {
   padding: 20px;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .admin-logout-button {
@@ -95,15 +181,16 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: color 0.2s;
+  transition: all 0.2s;
   display: flex;
   align-items: center;
   gap: 0;
 }
 
 .admin-logout-button:hover {
-  background: transparent !important;
+  background: rgba(255, 223, 43, 0.1) !important;
   color: #FFDF2B !important;
+  border-radius: 4px;
 }
 
 /* Main Content */
@@ -149,4 +236,85 @@
 
 .admin-nav-button.active .admin-badge {
   background: #dc2626;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .admin-layout {
+    flex-direction: column;
+  }
+
+  /* Show mobile header */
+  .admin-mobile-header {
+    display: flex;
+  }
+
+  /* Show mobile overlay when menu is open */
+  .admin-mobile-overlay {
+    display: block;
+  }
+
+  /* Hide sidebar by default on mobile */
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 999;
+    transform: translateX(-100%);
+    width: 250px;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Show sidebar when mobile menu is open */
+  .admin-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* Adjust main content for mobile */
+  .admin-main-content {
+    margin-top: 60px;
+    width: 100%;
+    height: calc(100vh - 60px);
+  }
+
+  /* Hide sidebar logo on mobile since we have it in the header */
+  .admin-sidebar-logo {
+    display: none;
+  }
+
+  /* Adjust navigation for mobile */
+  .admin-nav-button {
+    padding: 16px 20px;
+    font-size: 16px;
+  }
+
+  .admin-logout-button {
+    padding: 16px 20px;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-sidebar {
+    width: 280px;
+  }
+
+  .admin-mobile-header {
+    padding: 10px 16px;
+  }
+
+  .admin-mobile-logo-text {
+    font-size: 14px;
+  }
+
+  .admin-nav-button {
+    padding: 18px 20px;
+    font-size: 15px;
+  }
+
+  .admin-logout-button {
+    padding: 18px 20px;
+    font-size: 15px;
+  }
 }

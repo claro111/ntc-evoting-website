@@ -120,7 +120,8 @@ const VoterLayout = () => {
           showNotification(
             'new-announcement',
             'NEW ANNOUNCEMENT',
-            `${announcementData.title}\nCheck announcements page.`
+            `${announcementData.title}\nCheck announcements page.`,
+            { id: latestAnnouncement.id, ...announcementData }
           );
         }
         
@@ -195,6 +196,7 @@ const VoterLayout = () => {
         type={notification.type}
         title={notification.title}
         message={notification.message}
+        announcementData={notification.announcementData}
         onClose={hideNotification}
       />
     </div>

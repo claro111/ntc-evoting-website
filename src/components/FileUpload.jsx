@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import FilePreview from './FilePreview';
 import './FileUpload.css';
 
 const FileUpload = ({
@@ -55,13 +56,9 @@ const FileUpload = ({
       return;
     }
 
-    // Create preview for images
-    if (showPreview && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setPreview(e.target.result);
-      };
-      reader.readAsDataURL(file);
+    // Set preview for any file type if showPreview is enabled
+    if (showPreview) {
+      setPreview(URL.createObjectURL(file));
     } else {
       setPreview(null);
     }
@@ -77,6 +74,10 @@ const FileUpload = ({
   };
 
   const clearFile = () => {
+    // Clean up object URL if it exists
+    if (preview && typeof preview === 'string' && preview.startsWith('blob:')) {
+      URL.revokeObjectURL(preview);
+    }
     setPreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -121,20 +122,30 @@ const FileUpload = ({
           className="file-input-hidden"
         />
 
-        {preview ? (
-          <div className="file-preview">
-            <img src={preview} alt="Preview" className="preview-image" />
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                clearFile();
-              }}
-              className="clear-file-btn"
-              disabled={disabled}
-            >
-              ✕
-            </button>
+        {preview && currentFile ? (
+          <div className="file-upload-preview">
+            <div className="file-upload-preview-header">
+              <span className="selected-file-label">Selected File:</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearFile();
+                }}
+                className="clear-file-btn"
+                disabled={disabled}
+                title="Remove file"
+              >
+                ✕
+              </button>
+            </div>
+            <FilePreview
+              fileUrl={preview}
+              fileName={currentFile.name}
+              maxHeight="200px"
+              showDownloadLink={false}
+              className="upload-preview"
+            />
           </div>
         ) : currentFile ? (
           <div className="current-file">

@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cleanup Voters Collection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { 
+            background-color: #6c757d; 
+            cursor: not-allowed; 
+        }
+        .danger { background-color: #dc3545; }
+        .danger:hover { background-color: #c82333; }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .voter-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .voter-item {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+        .voter-item.registered { border-left: 4px solid #28a745; }
+        .voter-item.pending { border-left: 4px solid #ffc107; }
+        .voter-item.deactivated { border-left: 4px solid #dc3545; }
+        .voter-item.unknown { border-left: 4px solid #6c757d; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            color: white;
+        }
+        .stat-registered { background-color: #28a745; }
+        .stat-pending { background-color: #ffc107; }
+        .stat-deactivated { background-color: #dc3545; }
+        .stat-total { background-color: #007bff; }
+        input[type="checkbox"] {
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Cleanup Voters Collection</h1>
+        <p>This tool helps you analyze and clean up the voters collection in Firestore.</p>
+
+        <div class="section">
+            <h3>Step 1: Analyze Current State</h3>
+            <button onclick="analyzeVoters()" id="analyzeBtn">🔍 Analyze Voters Collection</button>
+            <div id="analysisResults"></div>
+        </div>
+
+        <div class="section">
+            <h3>Step 2: Review Voters by Status</h3>
+            <div id="votersByStatus"></div>
+        </div>
+
+        <div class="section">
+            <h3>Step 3: Cleanup Options</h3>
+            <div id="cleanupOptions"></div>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, collection, getDocs, doc, deleteDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration - Replace with your actual config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDxP8OKeam4rWvDwehGvo8vjSl15s0onfA",
+            authDomain: "ntc-evoting-website.firebaseapp.com",
+            projectId: "ntc-evoting-website",
+            storageBucket: "ntc-evoting-website.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdefghijklmnop"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Make functions available globally
+        window.auth = auth;
+        window.db = db;
+        window.collection = collection;
+        window.getDocs = getDocs;
+        window.doc = doc;
+        window.deleteDoc = deleteDoc;
+        window.query = query;
+        window.where = where;
+
+        // Auto-login prompt
+        window.addEventListener('load', () => {
+            addResult('info', 'Ready for analysis. Please ensure you are logged in as an admin.');
+        });
+    </script>
+
+    <script>
+        let allVoters = [];
+        let voterStats = {
+            total: 0,
+            registered: 0,
+            pending: 0,
+            deactivated: 0,
+            unknown: 0
+        };
+
+        function addResult(type, message) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        async function analyzeVoters() {
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = 'Analyzing...';
+
+            try {
+                addResult('info', 'Fetching all voters from Firestore...');
+
+                // Get all voters
+                const votersRef = collection(db, 'voters');
+                const snapshot = await getDocs(votersRef);
+                
+                allVoters = [];
+                voterStats = { total: 0, registered: 0, pending: 0, deactivated: 0, unknown: 0 };
+
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    const voter = {
+                        id: doc.id,
+                        ...data
+                    };
+                    allVoters.push(voter);
+
+                    // Count by status
+                    voterStats.total++;
+                    switch (data.status) {
+                        case 'registered':
+                            voterStats.registered++;
+                            break;
+                        case 'pending':
+                            voterStats.pending++;
+                            break;
+                        case 'deactivated':
+                            voterStats.deactivated++;
+                            break;
+                        default:
+                            voterStats.unknown++;
+                    }
+                });
+
+                displayAnalysis();
+                displayVotersByStatus();
+                displayCleanupOptions();
+
+                addResult('success', `Analysis complete! Found ${voterStats.total} total documents.`);
+
+            } catch (error) {
+                addResult('error', `Error analyzing voters: ${error.message}`);
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = '🔍 Analyze Voters Collection';
+            }
+        }
+
+        function displayAnalysis() {
+            const analysisDiv = document.getElementById('analysisResults');
+            
+            // Count email verification status
+            let emailVerifiedCount = 0;
+            let emailNotVerifiedCount = 0;
+            let noEmailStatusCount = 0;
+            
+            allVoters.forEach(voter => {
+                if (voter.emailVerified === true) {
+                    emailVerifiedCount++;
+                } else if (voter.emailVerified === false) {
+                    emailNotVerifiedCount++;
+                } else {
+                    noEmailStatusCount++;
+                }
+            });
+            
+            const statsHtml = `
+                <div class="stats">
+                    <div class="stat-card stat-total">
+                        <h4>Total Documents</h4>
+                        <h2>${voterStats.total}</h2>
+                    </div>
+                    <div class="stat-card stat-registered">
+                        <h4>Registered</h4>
+                        <h2>${voterStats.registered}</h2>
+                    </div>
+                    <div class="stat-card stat-pending">
+                        <h4>Pending</h4>
+                        <h2>${voterStats.pending}</h2>
+                    </div>
+                    <div class="stat-card stat-deactivated">
+                        <h4>Deactivated</h4>
+                        <h2>${voterStats.deactivated}</h2>
+                    </div>
+                </div>
+                <div class="stats">
+                    <div class="stat-card stat-registered">
+                        <h4>Email Verified</h4>
+                        <h2>${emailVerifiedCount}</h2>
+                    </div>
+                    <div class="stat-card stat-pending">
+                        <h4>Email Not Verified</h4>
+                        <h2>${emailNotVerifiedCount}</h2>
+                    </div>
+                    <div class="stat-card stat-deactivated">
+                        <h4>No Email Status</h4>
+                        <h2>${noEmailStatusCount}</h2>
+                    </div>
+                    <div class="stat-card stat-total">
+                        <h4>Unknown Status</h4>
+                        <h2>${voterStats.unknown}</h2>
+                    </div>
+                </div>
+            `;
+
+            let recommendationHtml = '';
+            if (voterStats.registered > 2 && emailVerifiedCount > 2) {
+                recommendationHtml = `
+                    <div class="status warning">
+                        <strong>⚠️ Suspicious Data Detected:</strong> You have ${voterStats.registered} registered voters but expect only 2. 
+                        This suggests duplicate or test accounts. ${emailVerifiedCount} have verified emails.
+                        <br><strong>Recommendation:</strong> Review the detailed list below to identify duplicates or test accounts.
+                    </div>
+                `;
+            } else if (voterStats.total > voterStats.registered + 2) {
+                recommendationHtml = `
+                    <div class="status warning">
+                        <strong>⚠️ Cleanup Recommended:</strong> You have ${voterStats.total} total documents but only ${voterStats.registered} registered voters. 
+                        Consider cleaning up ${voterStats.pending} pending and ${voterStats.deactivated} deactivated voters.
+                    </div>
+                `;
+            } else {
+                recommendationHtml = `
+                    <div class="status success">
+                        <strong>✅ Collection looks clean:</strong> Document count seems reasonable for your registered voters.
+                    </div>
+                `;
+            }
+
+            analysisDiv.innerHTML = statsHtml + recommendationHtml;
+        }
+
+        function displayVotersByStatus() {
+            const statusDiv = document.getElementById('votersByStatus');
+            
+            let html = '';
+
+            // First, show duplicate emails
+            const emailGroups = {};
+            allVoters.forEach(voter => {
+                if (voter.email) {
+                    if (!emailGroups[voter.email]) {
+                        emailGroups[voter.email] = [];
+                    }
+                    emailGroups[voter.email].push(voter);
+                }
+            });
+
+            const duplicateEmails = Object.entries(emailGroups).filter(([email, voters]) => voters.length > 1);
+            
+            if (duplicateEmails.length > 0) {
+                html += `
+                    <div class="status warning">
+                        <strong>🚨 DUPLICATE EMAILS DETECTED:</strong> Found ${duplicateEmails.length} email addresses with multiple registrations.
+                    </div>
+                    <h4>DUPLICATE EMAIL ADDRESSES (${duplicateEmails.length})</h4>
+                    <div class="voter-list">
+                `;
+                
+                duplicateEmails.forEach(([email, voters]) => {
+                    html += `<div style="border: 2px solid #dc3545; margin: 10px 0; padding: 10px; border-radius: 5px;">`;
+                    html += `<strong style="color: #dc3545;">📧 ${email} (${voters.length} registrations)</strong><br>`;
+                    
+                    // Sort by status priority: registered > approved_pending_verification > pending > deactivated
+                    const statusPriority = { 'registered': 1, 'approved_pending_verification': 2, 'pending': 3, 'deactivated': 4 };
+                    voters.sort((a, b) => (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99));
+                    
+                    voters.forEach((voter, index) => {
+                        const createdAt = voter.createdAt ? new Date(voter.createdAt.toDate()).toLocaleDateString() : 'Unknown';
+                        const emailStatus = voter.emailVerified === true ? '✅ Verified' : 
+                                          voter.emailVerified === false ? '❌ Not Verified' : '❓ Unknown';
+                        const isRecommendedKeep = index === 0; // Keep the first one (highest priority status)
+                        
+                        html += `
+                            <div class="voter-item ${voter.status}" style="margin: 5px 0; ${isRecommendedKeep ? 'border-left: 4px solid #28a745;' : 'border-left: 4px solid #dc3545;'}">
+                                ${isRecommendedKeep ? '✅ KEEP' : '🗑️ DELETE'} - <strong>${voter.fullName || 'No Name'}</strong><br>
+                                <small>Status: ${voter.status} | Created: ${createdAt} | Email: ${emailStatus}</small><br>
+                                <small>ID: ${voter.id} | Student ID: ${voter.studentId || 'N/A'}</small>
+                                ${!isRecommendedKeep ? `<br><input type="checkbox" id="delete_${voter.id}" data-voter-id="${voter.id}" checked> Mark for deletion (duplicate)` : ''}
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
+                });
+                
+                html += '</div>';
+            }
+
+            const statuses = ['registered', 'approved_pending_verification', 'pending', 'deactivated'];
+            
+            statuses.forEach(status => {
+                const voters = allVoters.filter(v => v.status === status);
+                if (voters.length > 0) {
+                    html += `
+                        <h4>${status.toUpperCase()} (${voters.length})</h4>
+                        <div class="voter-list">
+                    `;
+                    
+                    voters.forEach(voter => {
+                        const createdAt = voter.createdAt ? new Date(voter.createdAt.toDate()).toLocaleDateString() : 'Unknown';
+                        const emailStatus = voter.emailVerified === true ? '✅ Verified' : 
+                                          voter.emailVerified === false ? '❌ Not Verified' : '❓ Unknown';
+                        const hasVoted = voter.hasVoted ? '🗳️ Voted' : '⏳ Not Voted';
+                        
+                        html += `
+                            <div class="voter-item ${status}">
+                                <strong>${voter.fullName || 'No Name'}</strong> (${voter.email || 'No Email'})<br>
+                                <small>ID: ${voter.id} | Created: ${createdAt} | Student ID: ${voter.studentId || 'N/A'}</small><br>
+                                <small>Email: ${emailStatus} | Voting: ${hasVoted}</small>
+                                ${status === 'registered' && voters.length > 2 ? `<br><input type="checkbox" id="delete_${voter.id}" data-voter-id="${voter.id}"> Mark as duplicate/test account` : ''}
+                                ${status !== 'registered' ? `<br><input type="checkbox" id="delete_${voter.id}" data-voter-id="${voter.id}"> Mark for deletion` : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                }
+            });
+
+            // Show unknown status voters
+            const unknownVoters = allVoters.filter(v => !['registered', 'pending', 'deactivated'].includes(v.status));
+            if (unknownVoters.length > 0) {
+                html += `
+                    <h4>UNKNOWN STATUS (${unknownVoters.length})</h4>
+                    <div class="voter-list">
+                `;
+                
+                unknownVoters.forEach(voter => {
+                    const createdAt = voter.createdAt ? new Date(voter.createdAt.toDate()).toLocaleDateString() : 'Unknown';
+                    html += `
+                        <div class="voter-item unknown">
+                            <strong>${voter.fullName || 'No Name'}</strong> (${voter.email || 'No Email'})<br>
+                            <small>ID: ${voter.id} | Status: ${voter.status || 'undefined'} | Created: ${createdAt}</small>
+                            <br><input type="checkbox" id="delete_${voter.id}" data-voter-id="${voter.id}"> Mark for deletion
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+            }
+
+            statusDiv.innerHTML = html;
+        }
+
+        function displayCleanupOptions() {
+            const cleanupDiv = document.getElementById('cleanupOptions');
+            
+            let html = '';
+            
+            if (voterStats.pending > 0) {
+                html += `
+                    <button onclick="selectAllPending()" class="danger">Select All Pending (${voterStats.pending})</button>
+                `;
+            }
+            
+            if (voterStats.deactivated > 0) {
+                html += `
+                    <button onclick="selectAllDeactivated()" class="danger">Select All Deactivated (${voterStats.deactivated})</button>
+                `;
+            }
+            
+            if (voterStats.unknown > 0) {
+                html += `
+                    <button onclick="selectAllUnknown()" class="danger">Select All Unknown Status (${voterStats.unknown})</button>
+                `;
+            }
+            
+            // If there are more than 2 registered voters, allow selection
+            // Check for duplicate emails
+            const emailGroups = {};
+            allVoters.forEach(voter => {
+                if (voter.email) {
+                    if (!emailGroups[voter.email]) {
+                        emailGroups[voter.email] = [];
+                    }
+                    emailGroups[voter.email].push(voter);
+                }
+            });
+            const duplicateCount = Object.values(emailGroups).filter(voters => voters.length > 1).length;
+            
+            if (duplicateCount > 0) {
+                html += `
+                    <button onclick="selectAllDuplicates()" class="danger">🚨 Select All Duplicates (Auto-detected)</button>
+                `;
+            }
+
+            if (voterStats.registered > 2) {
+                html += `
+                    <div class="status warning">
+                        <strong>⚠️ Multiple Registered Voters Detected:</strong> You have ${voterStats.registered} registered voters but expect only 2. 
+                        Review the list above and manually select duplicates or test accounts.
+                    </div>
+                `;
+            }
+            
+            if (voterStats.pending > 0 || voterStats.deactivated > 0 || voterStats.unknown > 0 || voterStats.registered > 2) {
+                html += `
+                    <button onclick="deleteSelected()" class="danger">🗑️ Delete Selected</button>
+                    <button onclick="clearSelection()">Clear Selection</button>
+                `;
+            }
+
+            if (html) {
+                cleanupDiv.innerHTML = `
+                    <div class="status warning">
+                        <strong>⚠️ Cleanup Actions:</strong> These actions will permanently delete voter documents from Firestore.
+                    </div>
+                    ${html}
+                `;
+            } else {
+                cleanupDiv.innerHTML = `
+                    <div class="status info">
+                        <strong>ℹ️ No cleanup needed:</strong> All documents appear to be active registered voters.
+                    </div>
+                `;
+            }
+        }
+
+        function selectAllPending() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                const voterId = cb.dataset.voterId;
+                const voter = allVoters.find(v => v.id === voterId);
+                if (voter && voter.status === 'pending') {
+                    cb.checked = true;
+                }
+            });
+        }
+
+        function selectAllDeactivated() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                const voterId = cb.dataset.voterId;
+                const voter = allVoters.find(v => v.id === voterId);
+                if (voter && voter.status === 'deactivated') {
+                    cb.checked = true;
+                }
+            });
+        }
+
+        function selectAllUnknown() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                const voterId = cb.dataset.voterId;
+                const voter = allVoters.find(v => v.id === voterId);
+                if (voter && !['registered', 'pending', 'deactivated'].includes(voter.status)) {
+                    cb.checked = true;
+                }
+            });
+        }
+
+        function selectAllDuplicates() {
+            // This will select all checkboxes that are already checked (duplicates are pre-checked)
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                // If it's already checked (duplicate), keep it checked
+                // If it's not checked, don't change it
+                if (cb.hasAttribute('checked')) {
+                    cb.checked = true;
+                }
+            });
+            addResult('info', 'Selected all duplicate email registrations for deletion. Review the selection before deleting.');
+        }
+
+        function clearSelection() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = false);
+        }
+
+        async function deleteSelected() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+            
+            if (checkboxes.length === 0) {
+                addResult('warning', 'No voters selected for deletion.');
+                return;
+            }
+
+            const confirmed = confirm(`Are you sure you want to delete ${checkboxes.length} voter documents? This action cannot be undone.`);
+            if (!confirmed) return;
+
+            addResult('info', `Starting deletion of ${checkboxes.length} voter documents...`);
+
+            let deleted = 0;
+            let errors = 0;
+
+            for (const checkbox of checkboxes) {
+                const voterId = checkbox.dataset.voterId;
+                try {
+                    const voterRef = doc(db, 'voters', voterId);
+                    await deleteDoc(voterRef);
+                    deleted++;
+                    addResult('success', `Deleted voter: ${voterId}`);
+                } catch (error) {
+                    errors++;
+                    addResult('error', `Failed to delete ${voterId}: ${error.message}`);
+                }
+            }
+
+            addResult('info', `Cleanup complete! Deleted: ${deleted}, Errors: ${errors}`);
+            
+            // Re-analyze after cleanup
+            setTimeout(() => analyzeVoters(), 1000);
+        }
+    </script>
+</body>
+</html>

@@ -99,15 +99,39 @@ export class FileUploadService {
     try {
       if (!fileUrl) return;
       
-      // Create reference from URL
-      const fileRef = ref(storage, fileUrl);
+      // Extract file path from Firebase Storage URL
+      let filePath;
+      
+      if (fileUrl.includes('/o/')) {
+        // Standard Firebase Storage URL format
+        const urlParts = fileUrl.split('/o/');
+        if (urlParts.length >= 2) {
+          filePath = decodeURIComponent(urlParts[1].split('?')[0]);
+        }
+      } else if (fileUrl.includes('gs://')) {
+        // gs:// format
+        filePath = fileUrl.replace(/^gs:\/\/[^\/]+\//, '');
+      } else {
+        // Assume it's already a path
+        filePath = fileUrl;
+      }
+      
+      if (!filePath) {
+        throw new Error('Could not extract file path from URL');
+      }
+      
+      console.log('Deleting file at path:', filePath);
+      
+      // Create reference from path
+      const fileRef = ref(storage, filePath);
       
       // Delete file
       await deleteObject(fileRef);
       
-      console.log('File deleted successfully');
+      console.log('File deleted successfully:', filePath);
     } catch (error) {
       console.error('Error deleting file:', error);
+      console.error('File URL was:', fileUrl);
       // Don't throw error for delete operations to avoid breaking the flow
     }
   }

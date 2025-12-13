@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Admin Deletion</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.danger {
+            background: #dc3545;
+        }
+        button.danger:hover {
+            background: #c82333;
+        }
+        .results {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .info {
+            color: #17a2b8;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Admin Deletion</h1>
+        <p>This tool helps test the permanent admin deletion functionality.</p>
+
+        <div class="test-section">
+            <h3>📋 Test Instructions</h3>
+            <ol>
+                <li>Create a test admin account in the admin panel</li>
+                <li>Note the admin ID (UID) from Firebase Authentication</li>
+                <li>Use the test deletion function below</li>
+                <li>Verify the admin is deleted from both Authentication and Firestore</li>
+            </ol>
+            <p><strong>⚠️ Warning:</strong> Only use this with test accounts. Deletion is permanent!</p>
+        </div>
+
+        <div class="test-section">
+            <h3>🗑️ Test Admin Deletion</h3>
+            <p>Enter the admin ID (UID) to test deletion:</p>
+            <input type="text" id="adminId" placeholder="Enter admin UID">
+            <button class="danger" onclick="testAdminDeletion()">Test Delete Admin</button>
+            <div id="deleteResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 List All Admins</h3>
+            <p>List all admins in the system:</p>
+            <button onclick="listAdmins()">List Admins</button>
+            <div id="listResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Check Admin Existence</h3>
+            <p>Check if an admin exists in both Authentication and Firestore:</p>
+            <input type="text" id="checkAdminId" placeholder="Enter admin UID to check">
+            <button onclick="checkAdminExists()">Check Admin</button>
+            <div id="checkResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📈 System Status</h3>
+            <button onclick="getSystemStatus()">Get System Status</button>
+            <div id="statusResults" class="results"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, collection, getDocs, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDxP8OKeam4rWvDwehGvo8vjSl15s0onfA",
+            authDomain: "ntc-evoting-website.firebaseapp.com",
+            projectId: "ntc-evoting-website",
+            storageBucket: "ntc-evoting-website.appspot.com",
+            messagingSenderId: "590550683609",
+            appId: "1:590550683609:web:d9a5f8c5c5c5c5c5c5c5c5"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Make functions globally available
+        window.testAdminDeletion = async function() {
+            const adminId = document.getElementById('adminId').value.trim();
+            const resultsDiv = document.getElementById('deleteResults');
+            
+            if (!adminId) {
+                resultsDiv.innerHTML = '<span class="error">Please enter an admin ID</span>';
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to test deletion of admin: ${adminId}?\n\nThis will actually delete the admin if it exists!`)) {
+                return;
+            }
+
+            try {
+                resultsDiv.innerHTML = '<span class="info">Testing admin deletion...</span>';
+                
+                // Get current user's auth token
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('User not authenticated. Please log in first.');
+                }
+                
+                const idToken = await user.getIdToken();
+                
+                // Call Cloud Function
+                const response = await fetch('https://us-central1-ntc-evoting-website.cloudfunctions.net/deleteAdminPermanently', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`
+                    },
+                    body: JSON.stringify({ adminId })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to delete admin');
+                }
+                
+                const result = await response.json();
+                
+                resultsDiv.innerHTML = `
+<span class="success">✅ Admin deletion test completed</span>
+
+<strong>Result:</strong> ${result.message}
+<strong>Deleted from Auth:</strong> ${result.authDeleted ? '✅ Yes' : '❌ No'}
+<strong>Deleted from Firestore:</strong> ${result.deletedFromFirestore ? '✅ Yes' : '❌ No'}
+
+<strong>Full Response:</strong>
+${JSON.stringify(result, null, 2)}
+                `;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+                console.error('Admin deletion test error:', error);
+            }
+        };
+
+        window.listAdmins = async function() {
+            const resultsDiv = document.getElementById('listResults');
+            
+            try {
+                resultsDiv.innerHTML = '<span class="info">Loading admins...</span>';
+                
+                const adminsSnapshot = await getDocs(collection(db, 'admins'));
+                
+                if (adminsSnapshot.empty) {
+                    resultsDiv.innerHTML = '<span class="info">No admins found in Firestore</span>';
+                    return;
+                }
+                
+                let adminsList = `<strong>Found ${adminsSnapshot.size} admins in Firestore:</strong>\n\n`;
+                
+                adminsSnapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    adminsList += `📧 ${data.email || 'No email'}\n`;
+                    adminsList += `   ID: ${doc.id}\n`;
+                    adminsList += `   Name: ${data.name || 'No name'}\n`;
+                    adminsList += `   Role: ${data.role || 'No role'}\n`;
+                    adminsList += `   Created: ${data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString() : 'Unknown'}\n\n`;
+                });
+                
+                resultsDiv.innerHTML = adminsList;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<span class="error">❌ Error listing admins: ${error.message}</span>`;
+            }
+        };
+
+        window.checkAdminExists = async function() {
+            const adminId = document.getElementById('checkAdminId').value.trim();
+            const resultsDiv = document.getElementById('checkResults');
+            
+            if (!adminId) {
+                resultsDiv.innerHTML = '<span class="error">Please enter an admin ID</span>';
+                return;
+            }
+
+            try {
+                resultsDiv.innerHTML = '<span class="info">Checking admin existence...</span>';
+                
+                // Check Firestore
+                const adminDoc = await getDoc(doc(db, 'admins', adminId));
+                const existsInFirestore = adminDoc.exists();
+                
+                // Note: We can't directly check Firebase Auth from client-side
+                // This would need to be done server-side
+                
+                let result = `<strong>Admin Existence Check for ID: ${adminId}</strong>\n\n`;
+                result += `<strong>Firestore Database:</strong> ${existsInFirestore ? '✅ EXISTS' : '❌ NOT FOUND'}\n`;
+                
+                if (existsInFirestore) {
+                    const data = adminDoc.data();
+                    result += `   Email: ${data.email || 'N/A'}\n`;
+                    result += `   Name: ${data.name || 'N/A'}\n`;
+                    result += `   Role: ${data.role || 'N/A'}\n`;
+                    result += `   Created: ${data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString() : 'N/A'}\n`;
+                }
+                
+                result += `\n<strong>Firebase Authentication:</strong> Cannot check from client-side\n`;
+                result += `(Use Firebase Console or server-side tools to verify)`;
+                
+                resultsDiv.innerHTML = result;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<span class="error">❌ Error checking admin: ${error.message}</span>`;
+            }
+        };
+
+        window.getSystemStatus = async function() {
+            const resultsDiv = document.getElementById('statusResults');
+            
+            try {
+                resultsDiv.innerHTML = '<span class="info">Getting system status...</span>';
+                
+                // Count admins
+                const adminsSnapshot = await getDocs(collection(db, 'admins'));
+                const adminCount = adminsSnapshot.size;
+                
+                // Count voters
+                const votersSnapshot = await getDocs(collection(db, 'voters'));
+                const voterCount = votersSnapshot.size;
+                
+                // Count candidates
+                const candidatesSnapshot = await getDocs(collection(db, 'candidates'));
+                const candidateCount = candidatesSnapshot.size;
+                
+                // Get current user info
+                const user = auth.currentUser;
+                const currentUserInfo = user ? {
+                    uid: user.uid,
+                    email: user.email,
+                    emailVerified: user.emailVerified
+                } : null;
+                
+                const status = `
+<strong>📊 System Status</strong>
+
+<strong>Database Counts:</strong>
+• Admins: ${adminCount}
+• Voters: ${voterCount}
+• Candidates: ${candidateCount}
+
+<strong>Current User:</strong>
+${currentUserInfo ? `
+• UID: ${currentUserInfo.uid}
+• Email: ${currentUserInfo.email}
+• Email Verified: ${currentUserInfo.emailVerified}
+` : '• Not logged in'}
+
+<strong>Cloud Functions:</strong>
+• deleteAdminPermanently: Available
+• deleteVoterPermanently: Available
+
+<strong>Test Environment:</strong>
+• Ready for admin deletion testing
+• Ensure you're logged in as a superadmin
+                `;
+                
+                resultsDiv.innerHTML = status;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<span class="error">❌ Error getting status: ${error.message}</span>`;
+            }
+        };
+
+        // Auto-login check
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                console.log('User logged in:', user.email);
+            } else {
+                console.log('User not logged in. Please log in to use deletion features.');
+            }
+        });
+
+        console.log('Admin deletion test tool loaded. Ready for testing.');
+    </script>
+</body>
+</html>

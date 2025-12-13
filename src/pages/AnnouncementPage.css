@@ -23,58 +23,147 @@
   margin: 0;
 }
 
+.announcements-section {
+  margin-top: 20px;
+}
+
+.section-header {
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+  padding: 0 4px;
+}
+
 .announcements-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .announcement-card {
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  padding: 24px;
+  border-radius: 12px;
+  padding: 16px;
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
 }
 
 .announcement-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
-.announcement-icon {
-  font-size: 32px;
+.announcement-left {
+  position: relative;
   flex-shrink: 0;
 }
 
-.announcement-card-content {
+.announcement-avatar {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #e5e7eb;
+}
+
+.notification-bell {
+  font-size: 24px;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  background: #007AFF;
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+.announcement-right {
   flex: 1;
+  min-width: 0;
+}
+
+.announcement-header-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+  gap: 12px;
 }
 
 .announcement-card-title {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 600;
   color: #1f2937;
-  margin: 0 0 8px 0;
+  margin: 0;
+  line-height: 1.3;
+  flex: 1;
+}
+
+.announcement-time {
+  font-size: 14px;
+  color: #6b7280;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .announcement-card-description {
-  font-size: 16px;
+  font-size: 14px;
   color: #6b7280;
-  line-height: 1.5;
+  line-height: 1.4;
+  margin: 4px 0 0 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  word-wrap: break-word;
-  word-break: break-word;
-  max-height: 3em;
+}
+
+.announcement-card-attachment {
+  margin: 8px 0 0 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.announcement-card-attachment .file-preview-container {
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.announcement-card-attachment .file-preview-content {
+  border-radius: 0;
+}
+
+.announcement-card-attachment .file-preview-image {
+  border-radius: 0;
+  width: 100%;
+  object-fit: cover;
+}
+
+.announcement-card-attachment .file-preview-fallback {
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 0;
 }
 
 /* Loading State */
@@ -243,20 +332,43 @@
     font-size: 28px;
   }
 
-  .announcement-card {
-    padding: 20px;
+  .section-title {
+    font-size: 20px;
   }
 
-  .announcement-icon {
-    font-size: 28px;
+  .announcement-card {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .announcement-avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .notification-bell {
+    font-size: 20px;
+  }
+
+  .notification-badge {
+    width: 14px;
+    height: 14px;
   }
 
   .announcement-card-title {
-    font-size: 18px;
+    font-size: 15px;
   }
 
   .announcement-card-description {
-    font-size: 14px;
+    font-size: 13px;
+  }
+
+  .announcement-time {
+    font-size: 12px;
+  }
+
+  .announcement-header-info {
+    gap: 8px;
   }
 
   .announcement-modal {
@@ -270,4 +382,26 @@
   .announcement-modal-content {
     font-size: 14px;
   }
+}
+/* Announcement Modal Attachment Styles */
+.announcement-modal-attachment {
+  margin-top: 20px;
+  border-top: 1px solid #e1e5e9;
+  padding-top: 20px;
+}
+
+.announcement-modal-attachment .file-preview-container {
+  margin: 0;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Ensure modal can accommodate larger content */
+.announcement-modal {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.announcement-modal-content {
+  max-height: none;
 }

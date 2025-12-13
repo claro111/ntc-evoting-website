@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Announcement Storage Deletion</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.danger {
+            background: #dc3545;
+        }
+        button.danger:hover {
+            background: #c82333;
+        }
+        .results {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .info {
+            color: #17a2b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Announcement Storage Deletion</h1>
+        <p>This tool helps verify that announcement attachments are properly deleted from Firebase Storage when announcements are deleted.</p>
+
+        <div class="test-section">
+            <h3>📋 Test Instructions</h3>
+            <ol>
+                <li>Create an announcement with an attachment in the admin panel</li>
+                <li>Note the announcement ID and attachment URL</li>
+                <li>Delete the announcement using the admin panel</li>
+                <li>Use the tools below to verify the attachment was deleted from storage</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Check Storage File Existence</h3>
+            <p>Enter the attachment URL to check if it still exists in Firebase Storage:</p>
+            <input type="text" id="attachmentUrl" placeholder="Enter attachment URL" style="width: 100%; padding: 8px; margin: 10px 0;">
+            <button onclick="checkFileExists()">Check File Existence</button>
+            <div id="fileCheckResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 List Announcement Attachments</h3>
+            <p>List all files in the announcement_attachments folder:</p>
+            <button onclick="listAnnouncementFiles()">List All Attachment Files</button>
+            <div id="listResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🗑️ Manual Storage Cleanup</h3>
+            <p>Manually delete orphaned attachment files (use with caution):</p>
+            <input type="text" id="filePathToDelete" placeholder="Enter file path to delete" style="width: 100%; padding: 8px; margin: 10px 0;">
+            <button class="danger" onclick="deleteFile()">Delete File</button>
+            <div id="deleteResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📈 Storage Usage Statistics</h3>
+            <button onclick="getStorageStats()">Get Storage Statistics</button>
+            <div id="statsResults" class="results"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getStorage, ref, listAll, getDownloadURL, deleteObject, getMetadata } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+        import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDxP8OKeam4rWvDwehGvo8vjSl15s0onfA",
+            authDomain: "ntc-evoting-website.firebaseapp.com",
+            projectId: "ntc-evoting-website",
+            storageBucket: "ntc-evoting-website.appspot.com",
+            messagingSenderId: "590550683609",
+            appId: "1:590550683609:web:d9a5f8c5c5c5c5c5c5c5c5"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const storage = getStorage(app);
+        const db = getFirestore(app);
+
+        // Make functions globally available
+        window.checkFileExists = async function() {
+            const url = document.getElementById('attachmentUrl').value.trim();
+            const resultsDiv = document.getElementById('fileCheckResults');
+            
+            if (!url) {
+                resultsDiv.innerHTML = '<span class="error">Please enter an attachment URL</span>';
+                return;
+            }
+
+            try {
+                resultsDiv.innerHTML = '<span class="info">Checking file existence...</span>';
+                
+                // Extract file path from URL (same logic as FileUploadService)
+                let filePath;
+                
+                if (url.includes('/o/')) {
+                    // Standard Firebase Storage URL format
+                    const urlParts = url.split('/o/');
+                    if (urlParts.length >= 2) {
+                        filePath = decodeURIComponent(urlParts[1].split('?')[0]);
+                    }
+                } else if (url.includes('gs://')) {
+                    // gs:// format
+                    filePath = url.replace(/^gs:\/\/[^\/]+\//, '');
+                } else {
+                    // Assume it's already a path
+                    filePath = url;
+                }
+                
+                if (!filePath) {
+                    throw new Error('Could not extract file path from URL');
+                }
+                
+                console.log('Extracted file path:', filePath);
+                const fileRef = ref(storage, filePath);
+                
+                // Try to get metadata (this will fail if file doesn't exist)
+                const metadata = await getMetadata(fileRef);
+                
+                resultsDiv.innerHTML = `
+                    <span class="success">✅ File EXISTS in storage</span>
+                    <br><strong>Original URL:</strong> ${url}
+                    <br><strong>Extracted Path:</strong> ${filePath}
+                    <br><strong>Size:</strong> ${(metadata.size / 1024).toFixed(2)} KB
+                    <br><strong>Created:</strong> ${metadata.timeCreated}
+                    <br><strong>Content Type:</strong> ${metadata.contentType}
+                `;
+            } catch (error) {
+                if (error.code === 'storage/object-not-found') {
+                    resultsDiv.innerHTML = `
+                        <span class="success">✅ File DOES NOT EXIST in storage (successfully deleted)</span>
+                        <br><strong>Original URL:</strong> ${url}
+                        <br><strong>Extracted Path:</strong> ${filePath || 'Could not extract path'}
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <span class="error">❌ Error checking file: ${error.message}</span>
+                        <br><strong>Original URL:</strong> ${url}
+                        <br><strong>Extracted Path:</strong> ${filePath || 'Could not extract path'}
+                        <br><strong>Error Code:</strong> ${error.code || 'N/A'}
+                    `;
+                }
+            }
+        };
+
+        window.listAnnouncementFiles = async function() {
+            const resultsDiv = document.getElementById('listResults');
+            
+            try {
+                resultsDiv.innerHTML = '<span class="info">Listing announcement attachment files...</span>';
+                
+                const attachmentsRef = ref(storage, 'announcement_attachments');
+                const result = await listAll(attachmentsRef);
+                
+                let fileList = '';
+                let totalSize = 0;
+                
+                if (result.items.length === 0) {
+                    fileList = '<span class="info">No attachment files found</span>';
+                } else {
+                    fileList = `<strong>Found ${result.items.length} files:</strong>\n\n`;
+                    
+                    for (const itemRef of result.items) {
+                        try {
+                            const metadata = await getMetadata(itemRef);
+                            const sizeKB = (metadata.size / 1024).toFixed(2);
+                            totalSize += metadata.size;
+                            
+                            fileList += `📎 ${itemRef.fullPath}\n`;
+                            fileList += `   Size: ${sizeKB} KB\n`;
+                            fileList += `   Created: ${new Date(metadata.timeCreated).toLocaleString()}\n\n`;
+                        } catch (error) {
+                            fileList += `📎 ${itemRef.fullPath} (Error getting metadata)\n\n`;
+                        }
+                    }
+                    
+                    fileList += `\n<strong>Total Size:</strong> ${(totalSize / 1024).toFixed(2)} KB`;
+                }
+                
+                // Also check for folders
+                if (result.prefixes.length > 0) {
+                    fileList += `\n\n<strong>Folders:</strong>\n`;
+                    result.prefixes.forEach(folderRef => {
+                        fileList += `📁 ${folderRef.fullPath}\n`;
+                    });
+                }
+                
+                resultsDiv.innerHTML = fileList;
+            } catch (error) {
+                resultsDiv.innerHTML = `<span class="error">❌ Error listing files: ${error.message}</span>`;
+            }
+        };
+
+        window.deleteFile = async function() {
+            const filePath = document.getElementById('filePathToDelete').value.trim();
+            const resultsDiv = document.getElementById('deleteResults');
+            
+            if (!filePath) {
+                resultsDiv.innerHTML = '<span class="error">Please enter a file path to delete</span>';
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete: ${filePath}?\n\nThis action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                resultsDiv.innerHTML = '<span class="info">Deleting file...</span>';
+                
+                const fileRef = ref(storage, filePath);
+                await deleteObject(fileRef);
+                
+                resultsDiv.innerHTML = `<span class="success">✅ File deleted successfully: ${filePath}</span>`;
+                document.getElementById('filePathToDelete').value = '';
+            } catch (error) {
+                resultsDiv.innerHTML = `<span class="error">❌ Error deleting file: ${error.message}</span>`;
+            }
+        };
+
+        window.getStorageStats = async function() {
+            const resultsDiv = document.getElementById('statsResults');
+            
+            try {
+                resultsDiv.innerHTML = '<span class="info">Calculating storage statistics...</span>';
+                
+                // Get announcement attachments stats
+                const attachmentsRef = ref(storage, 'announcement_attachments');
+                const attachmentsResult = await listAll(attachmentsRef);
+                
+                let attachmentStats = {
+                    count: 0,
+                    totalSize: 0
+                };
+                
+                for (const itemRef of attachmentsResult.items) {
+                    try {
+                        const metadata = await getMetadata(itemRef);
+                        attachmentStats.count++;
+                        attachmentStats.totalSize += metadata.size;
+                    } catch (error) {
+                        // Skip files with metadata errors
+                    }
+                }
+                
+                // Get announcements from Firestore for comparison
+                const announcementsSnapshot = await getDocs(collection(db, 'announcements'));
+                const announcementsWithAttachments = announcementsSnapshot.docs.filter(doc => 
+                    doc.data().attachmentUrl
+                ).length;
+                
+                const stats = `
+<strong>📊 Storage Statistics</strong>
+
+<strong>Announcement Attachments:</strong>
+• Files in storage: ${attachmentStats.count}
+• Total size: ${(attachmentStats.totalSize / 1024 / 1024).toFixed(2)} MB
+• Average file size: ${attachmentStats.count > 0 ? (attachmentStats.totalSize / attachmentStats.count / 1024).toFixed(2) : 0} KB
+
+<strong>Database Comparison:</strong>
+• Announcements with attachments: ${announcementsWithAttachments}
+• Storage vs Database difference: ${attachmentStats.count - announcementsWithAttachments}
+
+${attachmentStats.count !== announcementsWithAttachments ? 
+    '⚠️ Mismatch detected! There may be orphaned files in storage.' : 
+    '✅ Storage and database are in sync.'}
+                `;
+                
+                resultsDiv.innerHTML = stats;
+            } catch (error) {
+                resultsDiv.innerHTML = `<span class="error">❌ Error getting statistics: ${error.message}</span>`;
+            }
+        };
+
+        // Auto-login check
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                console.log('User logged in:', user.email);
+            } else {
+                console.log('User not logged in. Please log in to use all features.');
+            }
+        });
+    </script>
+</body>
+</html>

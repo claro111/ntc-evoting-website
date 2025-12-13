@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Storage Deletion</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.danger {
+            background: #dc3545;
+        }
+        button.danger:hover {
+            background: #c82333;
+        }
+        .results {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .info {
+            color: #17a2b8;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐛 Debug Storage Deletion</h1>
+        <p>This tool helps debug the Firebase Storage deletion functionality.</p>
+
+        <div class="test-section">
+            <h3>🔍 Test URL Path Extraction</h3>
+            <p>Test the URL parsing logic used in FileUploadService.deleteFile():</p>
+            <input type="text" id="testUrl" placeholder="Enter Firebase Storage URL">
+            <button onclick="testUrlExtraction()">Test URL Extraction</button>
+            <div id="urlResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🗑️ Test File Deletion</h3>
+            <p>Test the actual deletion functionality:</p>
+            <input type="text" id="deleteUrl" placeholder="Enter Firebase Storage URL to delete">
+            <button class="danger" onclick="testFileDeletion()">Test Delete File</button>
+            <div id="deleteResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Console Logs</h3>
+            <p>Check browser console for detailed logs. Open Developer Tools (F12) → Console tab.</p>
+            <button onclick="clearConsole()">Clear Console</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getStorage, ref, deleteObject, getMetadata } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDxP8OKeam4rWvDwehGvo8vjSl15s0onfA",
+            authDomain: "ntc-evoting-website.firebaseapp.com",
+            projectId: "ntc-evoting-website",
+            storageBucket: "ntc-evoting-website.appspot.com",
+            messagingSenderId: "590550683609",
+            appId: "1:590550683609:web:d9a5f8c5c5c5c5c5c5c5c5"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const storage = getStorage(app);
+
+        // Replicate the FileUploadService.deleteFile logic
+        async function deleteFile(fileUrl) {
+            try {
+                if (!fileUrl) return;
+                
+                // Extract file path from Firebase Storage URL
+                let filePath;
+                
+                if (fileUrl.includes('/o/')) {
+                    // Standard Firebase Storage URL format
+                    const urlParts = fileUrl.split('/o/');
+                    if (urlParts.length >= 2) {
+                        filePath = decodeURIComponent(urlParts[1].split('?')[0]);
+                    }
+                } else if (fileUrl.includes('gs://')) {
+                    // gs:// format
+                    filePath = fileUrl.replace(/^gs:\/\/[^\/]+\//, '');
+                } else {
+                    // Assume it's already a path
+                    filePath = fileUrl;
+                }
+                
+                if (!filePath) {
+                    throw new Error('Could not extract file path from URL');
+                }
+                
+                console.log('Deleting file at path:', filePath);
+                
+                // Create reference from path
+                const fileRef = ref(storage, filePath);
+                
+                // Delete file
+                await deleteObject(fileRef);
+                
+                console.log('File deleted successfully:', filePath);
+                return { success: true, filePath };
+            } catch (error) {
+                console.error('Error deleting file:', error);
+                console.error('File URL was:', fileUrl);
+                return { success: false, error, filePath };
+            }
+        }
+
+        // Make functions globally available
+        window.testUrlExtraction = function() {
+            const url = document.getElementById('testUrl').value.trim();
+            const resultsDiv = document.getElementById('urlResults');
+            
+            if (!url) {
+                resultsDiv.innerHTML = '<span class="error">Please enter a URL</span>';
+                return;
+            }
+
+            try {
+                console.log('Testing URL extraction for:', url);
+                
+                // Extract file path from Firebase Storage URL (same logic as deleteFile)
+                let filePath;
+                
+                if (url.includes('/o/')) {
+                    // Standard Firebase Storage URL format
+                    const urlParts = url.split('/o/');
+                    if (urlParts.length >= 2) {
+                        filePath = decodeURIComponent(urlParts[1].split('?')[0]);
+                    }
+                } else if (url.includes('gs://')) {
+                    // gs:// format
+                    filePath = url.replace(/^gs:\/\/[^\/]+\//, '');
+                } else {
+                    // Assume it's already a path
+                    filePath = url;
+                }
+                
+                const result = `
+<strong>URL Extraction Test Results:</strong>
+
+<strong>Input URL:</strong>
+${url}
+
+<strong>URL Type:</strong>
+${url.includes('/o/') ? 'Standard Firebase Storage URL (/o/ format)' : 
+  url.includes('gs://') ? 'Google Storage URL (gs:// format)' : 
+  'Direct path or unknown format'}
+
+<strong>Extracted Path:</strong>
+${filePath || 'FAILED - Could not extract path'}
+
+<strong>Path Valid:</strong>
+${filePath ? '✅ Yes' : '❌ No'}
+
+<strong>URL Parts (for /o/ format):</strong>
+${url.includes('/o/') ? url.split('/o/').map((part, i) => `Part ${i}: ${part}`).join('\n') : 'N/A - Not /o/ format'}
+                `;
+                
+                resultsDiv.innerHTML = result;
+                console.log('Extracted path:', filePath);
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+                console.error('URL extraction error:', error);
+            }
+        };
+
+        window.testFileDeletion = async function() {
+            const url = document.getElementById('deleteUrl').value.trim();
+            const resultsDiv = document.getElementById('deleteResults');
+            
+            if (!url) {
+                resultsDiv.innerHTML = '<span class="error">Please enter a URL</span>';
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to test deletion of:\n${url}\n\nThis will actually attempt to delete the file!`)) {
+                return;
+            }
+
+            try {
+                resultsDiv.innerHTML = '<span class="info">Testing file deletion...</span>';
+                console.log('Testing file deletion for:', url);
+                
+                const result = await deleteFile(url);
+                
+                if (result.success) {
+                    resultsDiv.innerHTML = `
+<span class="success">✅ File deletion test SUCCESSFUL</span>
+
+<strong>File Path:</strong> ${result.filePath}
+<strong>Status:</strong> File deleted successfully
+<strong>Check:</strong> File should no longer exist in Firebase Storage
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `
+<span class="error">❌ File deletion test FAILED</span>
+
+<strong>File Path:</strong> ${result.filePath || 'Could not extract path'}
+<strong>Error:</strong> ${result.error.message}
+<strong>Error Code:</strong> ${result.error.code || 'N/A'}
+<strong>Full Error:</strong> ${JSON.stringify(result.error, null, 2)}
+                    `;
+                }
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<span class="error">❌ Unexpected error: ${error.message}</span>`;
+                console.error('Test deletion error:', error);
+            }
+        };
+
+        window.clearConsole = function() {
+            console.clear();
+            console.log('Console cleared. Ready for new tests.');
+        };
+
+        // Auto-login check
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                console.log('User logged in:', user.email);
+            } else {
+                console.log('User not logged in. Please log in to use deletion features.');
+            }
+        });
+
+        console.log('Debug tool loaded. Ready for testing.');
+    </script>
+</body>
+</html>

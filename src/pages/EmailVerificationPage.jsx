@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { verifyEmail as verifyEmailToken } from '../services/voterService';
+import './EmailVerificationPage.css';
 
 const EmailVerificationPage = () => {
   const navigate = useNavigate();
@@ -66,68 +67,63 @@ const EmailVerificationPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200">
-      {/* Verification Card */}
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
+    <div className="verification-container">
+      <div className="verification-card">
         {/* NTC Logo */}
-        <div className="flex justify-center mb-6">
-          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-md border-4 border-blue-600">
-            <svg className="w-12 h-12 text-yellow-400" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 18c-3.86-.96-7-5.54-7-10V8.3l7-3.11 7 3.11V10c0 4.46-3.14 9.04-7 10z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-          </div>
+        <div className="logo-container">
+          <img src="/ntc-logo.png" alt="NTC Logo" className="ntc-logo" />
         </div>
 
         {/* Title */}
-        <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Email Verification</h2>
+        <h1 className="verification-title">NTC E-Voting</h1>
+        <h2 className="verification-subtitle">Email Verification</h2>
 
         {/* Status Icon and Message */}
-        <div className="text-center mb-8">
+        <div className="status-container">
           {status === 'verifying' && (
-            <div className="flex flex-col items-center">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mb-4"></div>
-              <p className="text-gray-600">{message}</p>
+            <div className="status-content">
+              <div className="loading-spinner"></div>
+              <p className="status-message">{message}</p>
             </div>
           )}
 
           {status === 'success' && (
-            <div className="flex flex-col items-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="status-content">
+              <div className="status-icon success">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="text-gray-800 font-semibold mb-2">Success!</p>
-              <p className="text-gray-600 text-sm">{message}</p>
+              <p className="status-title success">Success!</p>
+              <p className="status-message">{message}</p>
             </div>
           )}
 
           {status === 'error' && (
-            <div className="flex flex-col items-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="status-content">
+              <div className="status-icon error">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
-              <p className="text-gray-800 font-semibold mb-2">Verification Failed</p>
-              <p className="text-gray-600 text-sm">{message}</p>
+              <p className="status-title error">Verification Failed</p>
+              <p className="status-message">{message}</p>
             </div>
           )}
 
           {status === 'expired' && (
-            <div className="flex flex-col items-center">
-              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-10 h-10 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="status-content">
+              <div className="status-icon warning">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <p className="text-gray-800 font-semibold mb-2">Link Expired</p>
-              <p className="text-gray-600 text-sm mb-4">{message}</p>
+              <p className="status-title warning">Link Expired</p>
+              <p className="status-message">{message}</p>
               <button
                 onClick={handleResendEmail}
                 disabled={loading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-blue-300"
+                className="btn-resend"
               >
                 {loading ? 'Sending...' : 'Resend Verification Email'}
               </button>
@@ -137,11 +133,8 @@ const EmailVerificationPage = () => {
 
         {/* Action Buttons */}
         {(status === 'success' || status === 'error') && (
-          <div className="space-y-3">
-            <Link
-              to="/voter/login"
-              className="block w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition text-center shadow-md"
-            >
+          <div className="action-buttons">
+            <Link to="/voter/login" className="btn-login">
               Go to Login
             </Link>
             
@@ -149,7 +142,7 @@ const EmailVerificationPage = () => {
               <button
                 onClick={handleResendEmail}
                 disabled={loading}
-                className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition disabled:bg-gray-100"
+                className="btn-resend secondary"
               >
                 {loading ? 'Sending...' : 'Resend Verification Email'}
               </button>
@@ -158,12 +151,10 @@ const EmailVerificationPage = () => {
         )}
 
         {/* Help Text */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500">
+        <div className="help-text">
+          <p>
             Need help? Contact the administrator at{' '}
-            <a href="mailto:admin@ntc.edu.ph" className="text-blue-600 hover:underline">
-              admin@ntc.edu.ph
-            </a>
+            <a href="mailto:admin@ntc.edu.ph">admin@ntc.edu.ph</a>
           </p>
         </div>
       </div>

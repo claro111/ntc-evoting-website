@@ -6,6 +6,7 @@ import 'react-quill-new/dist/quill.snow.css';
 import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import FileUpload from '../components/FileUpload';
+import FilePreview from '../components/FilePreview';
 import FileUploadService from '../services/fileUploadService';
 import { useToast } from '../hooks/useToast';
 import { useConfirm } from '../hooks/useConfirm';
@@ -19,6 +20,7 @@ const ManageAnnouncementsPage = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const { toast, showToast, hideToast } = useToast();
   const { confirmState, showConfirm } = useConfirm();
@@ -48,6 +50,8 @@ const ManageAnnouncementsPage = () => {
     // Cleanup listener on unmount
     return () => unsubscribe();
   }, []);
+
+
 
   const handleClearForm = () => {
     setTitle('');
@@ -92,6 +96,20 @@ const ManageAnnouncementsPage = () => {
 
         // Only update attachment if new file was uploaded
         if (attachmentFile) {
+          // Find the existing announcement to get old attachment URL
+          const existingAnnouncement = announcements.find(a => a.id === editingId);
+          
+          // Delete old attachment if it exists and is different from new one
+          if (existingAnnouncement && existingAnnouncement.attachmentUrl) {
+            try {
+              await FileUploadService.deleteFile(existingAnnouncement.attachmentUrl);
+              console.log('Old attachment file deleted from storage');
+            } catch (storageError) {
+              console.error('Error deleting old attachment file:', storageError);
+              // Continue with update even if old file deletion fails
+            }
+          }
+
           updateData.attachmentUrl = attachmentUrl;
           updateData.attachmentName = attachmentName;
         }
@@ -139,7 +157,7 @@ const ManageAnnouncementsPage = () => {
     const confirmed = await showConfirm({
       title: 'Delete Announcement',
       message: 'Are you sure you want to delete this announcement?',
-      warningText: 'This action cannot be undone.',
+      warningText: 'This action cannot be undone. Any attached files will also be permanently deleted.',
       confirmText: 'Delete',
       cancelText: 'Cancel',
       type: 'danger'
@@ -150,12 +168,110 @@ const ManageAnnouncementsPage = () => {
     }
 
     try {
+      // Find the announcement to get attachment info
+      const announcement = announcements.find(a => a.id === announcementId);
+      
+      // Delete attachment file from Firebase Storage if it exists
+      if (announcement && announcement.attachmentUrl) {
+        try {
+          console.log('Attempting to delete attachment:', announcement.attachmentUrl);
+          await FileUploadService.deleteFile(announcement.attachmentUrl);
+          console.log('Attachment file deleted from storage successfully');
+        } catch (storageError) {
+          console.error('Error deleting attachment file:', storageError);
+          console.error('Attachment URL was:', announcement.attachmentUrl);
+          // Continue with announcement deletion even if storage deletion fails
+        }
+      } else {
+        console.log('No attachment to delete for this announcement');
+      }
+
+      // Delete the announcement document from Firestore
       await deleteDoc(doc(db, 'announcements', announcementId));
-      showToast('Announcement deleted successfully!', 'success');
+      
+      const successMessage = announcement && announcement.attachmentUrl 
+        ? 'Announcement and attachment deleted successfully!'
+        : 'Announcement deleted successfully!';
+      
+      showToast(successMessage, 'success');
       // No need to manually fetch - real-time listener will update automatically
     } catch (err) {
       console.error('Error deleting announcement:', err);
       showToast('Failed to delete announcement. Please try again.', 'error');
+    }
+  };
+
+  const handleDeleteAllAnnouncements = async () => {
+    const confirmed = await showConfirm({
+      title: 'Delete All Announcements',
+      message: `Are you sure you want to delete all ${announcements.length} announcements?`,
+      warningText: 'This action cannot be undone. All announcements and their attached files will be permanently deleted from both Firestore and Firebase Storage.',
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'danger'
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingAll(true);
+      
+      let deletedCount = 0;
+      let deletedFilesCount = 0;
+      let errors = [];
+
+      // Process each announcement
+      for (const announcement of announcements) {
+        try {
+          // Delete attachment file from Firebase Storage if it exists
+          if (announcement.attachmentUrl) {
+            try {
+              console.log('Deleting attachment for announcement:', announcement.id, announcement.attachmentUrl);
+              await FileUploadService.deleteFile(announcement.attachmentUrl);
+              deletedFilesCount++;
+              console.log('Attachment deleted successfully');
+            } catch (storageError) {
+              console.error('Error deleting attachment file:', storageError);
+              errors.push(`Failed to delete attachment for "${announcement.title}"`);
+              // Continue with announcement deletion even if storage deletion fails
+            }
+          }
+
+          // Delete the announcement document from Firestore
+          await deleteDoc(doc(db, 'announcements', announcement.id));
+          deletedCount++;
+          console.log('Announcement deleted:', announcement.id);
+          
+        } catch (err) {
+          console.error('Error deleting announcement:', announcement.id, err);
+          errors.push(`Failed to delete announcement "${announcement.title}"`);
+        }
+      }
+
+      // Show results
+      if (deletedCount === announcements.length && errors.length === 0) {
+        const message = deletedFilesCount > 0 
+          ? `All ${deletedCount} announcements and ${deletedFilesCount} attached files deleted successfully!`
+          : `All ${deletedCount} announcements deleted successfully!`;
+        showToast(message, 'success');
+      } else if (deletedCount > 0) {
+        const message = `${deletedCount} of ${announcements.length} announcements deleted successfully.`;
+        showToast(message, 'warning');
+        if (errors.length > 0) {
+          console.error('Deletion errors:', errors);
+        }
+      } else {
+        showToast('Failed to delete announcements. Please try again.', 'error');
+      }
+
+      setDeletingAll(false);
+      // No need to manually fetch - real-time listener will update automatically
+    } catch (err) {
+      console.error('Error in bulk delete operation:', err);
+      showToast('Failed to delete all announcements. Please try again.', 'error');
+      setDeletingAll(false);
     }
   };
 
@@ -244,7 +360,8 @@ const ManageAnnouncementsPage = () => {
             maxSize={25 * 1024 * 1024}
             placeholder="Upload attachment (PDF, images, documents, etc.)"
             uploadType="any"
-            showPreview={false}
+            showPreview={true}
+            currentFile={attachmentFile}
           />
         </div>
 
@@ -279,7 +396,26 @@ const ManageAnnouncementsPage = () => {
 
       {/* Posted Announcements */}
       <div className="announcements-list-section">
-        <h2 className="section-title">Posted Announcements</h2>
+        <div className="section-header-with-actions">
+          <h2 className="section-title">Posted Announcements</h2>
+          {canDelete('announcements') && announcements.length > 0 && (
+            <button
+              className="btn-delete-all"
+              onClick={handleDeleteAllAnnouncements}
+              disabled={deletingAll}
+            >
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+              {deletingAll ? 'Deleting All...' : 'Delete All Announcements'}
+            </button>
+          )}
+        </div>
         
         {announcements.length === 0 ? (
           <div className="empty-state">
@@ -309,14 +445,12 @@ const ManageAnnouncementsPage = () => {
 
                 {announcement.attachmentUrl && (
                   <div className="announcement-attachment">
-                    <a 
-                      href={announcement.attachmentUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="attachment-link"
-                    >
-                      📎 {announcement.attachmentName || 'Download Attachment'}
-                    </a>
+                    <FilePreview
+                      fileUrl={announcement.attachmentUrl}
+                      fileName={announcement.attachmentName}
+                      maxHeight="300px"
+                      showDownloadLink={true}
+                    />
                   </div>
                 )}
 

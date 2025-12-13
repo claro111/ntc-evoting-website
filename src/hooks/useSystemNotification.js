@@ -6,14 +6,16 @@ export const useSystemNotification = () => {
     type: '',
     title: '',
     message: '',
+    announcementData: null,
   });
 
-  const showNotification = useCallback((type, title, message) => {
+  const showNotification = useCallback((type, title, message, announcementData = null) => {
     setNotification({
       isVisible: true,
       type,
       title,
       message,
+      announcementData,
     });
   }, []);
 
